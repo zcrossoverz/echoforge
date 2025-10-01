@@ -1,68 +1,106 @@
-// internal/domain/user.go
 package domain
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 )
 
-// User entity (value object - immutable after create)
+// User represents a registered user within a site context
 type User struct {
-	ID           uuid.UUID `json:"id" validate:"required,uuid"` // Add 'uuid' tag cho stricter check
-	Email        string    `json:"email" validate:"required,email"`
-	PasswordHash string    `json:"-"` // Không expose raw hash
-	Role         string    `json:"role" validate:"omitempty,oneof=user admin"`
-	CreatedAt    time.Time `json:"created_at" validate:"omitempty"` // Optional tag
+	ID           uuid.UUID `json:"id"`
+	SiteID       uuid.UUID `json:"site_id"`
+	Email        string    `json:"email"`
+	PasswordHash string    `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// NewUser: Constructor với hashing trước, validate full entity sau (fix nil ID)
-func NewUser(email, password string) (*User, error) {
-	// Hash password first (business invariant)
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
+// Email validation regex (RFC 5322 simplified)
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
-	// Construct full entity
+// Validation constants
+const (
+	MaxEmailLength    = 255
+	MinPasswordLength = 60 // bcrypt hash length
+)
+
+// Domain errors
+var (
+	ErrInvalidEmail         = errors.New("invalid email format")
+	ErrEmailTooLong         = errors.New("email exceeds maximum length")
+	ErrPasswordHashTooShort = errors.New("password hash too short")
+	ErrRequiredField        = errors.New("required field is empty")
+	ErrUserAlreadyExists    = errors.New("user already exists with this email in site")
+	ErrRepositoryFailure    = errors.New("repository operation failed")
+)
+
+// NewUser creates a new User entity with validation
+func NewUser(siteID uuid.UUID, email, passwordHash string) (*User, error) {
+	now := time.Now()
+
 	user := &User{
-		ID:           uuid.New(), // Set ID trước validate
+		ID:           uuid.New(),
+		SiteID:       siteID,
 		Email:        email,
-		PasswordHash: string(hash),
-		Role:         "user", // Default
-		CreatedAt:    time.Now(),
+		PasswordHash: passwordHash,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 
-	// Validate full entity (ID now set, no nil)
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	if err := validate.Struct(user); err != nil {
-		return nil, err.(validator.ValidationErrors) // Or wrap to domain.ErrInvalidEmail
+	if err := user.Validate(); err != nil {
+		return nil, err
 	}
 
 	return user, nil
 }
 
-// CheckPassword: Giữ nguyên
-func (u *User) CheckPassword(password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
-	return err == nil
+// Validate performs business rule validation
+func (u *User) Validate() error {
+	// Required fields
+	if u.ID == uuid.Nil {
+		return fmt.Errorf("ID: %w", ErrRequiredField)
+	}
+	if u.SiteID == uuid.Nil {
+		return fmt.Errorf("SiteID: %w", ErrRequiredField)
+	}
+	if u.Email == "" {
+		return fmt.Errorf("Email: %w", ErrRequiredField)
+	}
+	if u.PasswordHash == "" {
+		return fmt.Errorf("PasswordHash: %w", ErrRequiredField)
+	}
+
+	// Email validation
+	if len(u.Email) > MaxEmailLength {
+		return fmt.Errorf("Email: %w (%d > %d)", ErrEmailTooLong, len(u.Email), MaxEmailLength)
+	}
+	if !emailRegex.MatchString(u.Email) {
+		return fmt.Errorf("Email: %w", ErrInvalidEmail)
+	}
+
+	// Password hash validation
+	if len(u.PasswordHash) < MinPasswordLength {
+		return fmt.Errorf("PasswordHash: %w (%d < %d)", ErrPasswordHashTooShort, len(u.PasswordHash), MinPasswordLength)
+	}
+
+	return nil
 }
 
-// UserRepository: Giữ nguyên
+// IsValid returns true if entity passes all validation rules
+func (u *User) IsValid() bool {
+	return u.Validate() == nil
+}
+
+// UserRepository defines the persistence contract for User entities
 type UserRepository interface {
-	Create(user *User) error
-	FindByEmail(email string) (*User, error)
-	Update(user *User) error
-	Delete(id uuid.UUID) error
-}
+	// Create persists a new user entity
+	Create(ctx context.Context, user *User) error
 
-// Domain errors: Giữ nguyên, add nếu cần
-var (
-	ErrUserExists    = errors.New("user already exists")
-	ErrUserNotFound  = errors.New("user not found")
-	ErrInvalidEmail  = errors.New("invalid email")
-	ErrWrongPassword = errors.New("wrong password")
-)
+	// FindByEmail retrieves a user by email within specific site
+	FindByEmail(ctx context.Context, siteID uuid.UUID, email string) (*User, error)
+}

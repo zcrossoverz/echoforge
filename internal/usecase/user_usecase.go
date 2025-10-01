@@ -1,62 +1,115 @@
-// internal/usecase/user_usecase.go
 package usecase
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/zcrossoverz/echoforge/internal/domain"
-	"github.com/zcrossoverz/echoforge/pkg/auth"
 )
 
-type UserUsecase struct {
-	repo domain.UserRepository
+// UserUseCase handles user-related business logic
+type UserUseCase struct {
+	userRepo domain.UserRepository
 }
 
-func NewUserUsecase(repo domain.UserRepository) *UserUsecase {
-	return &UserUsecase{repo: repo}
+// NewUserUseCase creates a new UserUseCase instance
+func NewUserUseCase(userRepo domain.UserRepository) *UserUseCase {
+	return &UserUseCase{
+		userRepo: userRepo,
+	}
 }
 
-// Register: Command - Create if not exists (business rule: unique email)
-func (uc *UserUsecase) Register(ctx context.Context, email, password string) (*domain.User, error) {
-	user, err := domain.NewUser(email, password)
+// CreateUser creates a new user with validation and persistence
+func (uc *UserUseCase) CreateUser(ctx context.Context, siteID uuid.UUID, email, passwordHash string) (*domain.User, error) {
+	// Check context early
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	// Validate input parameters
+	if siteID == uuid.Nil {
+		return nil, fmt.Errorf("invalid site ID: cannot be nil")
+	}
+
+	if email == "" {
+		return nil, fmt.Errorf("invalid email: cannot be empty")
+	}
+
+	if passwordHash == "" {
+		return nil, fmt.Errorf("invalid password hash: cannot be empty")
+	}
+
+	// Create domain entity (this will validate business rules)
+	user, err := domain.NewUser(siteID, email, passwordHash)
 	if err != nil {
-		return nil, err // Validation/hash error from domain
+		return nil, fmt.Errorf("failed to create user entity: %w", err)
 	}
 
-	// Check exists (idempotent business rule)
-	existing, err := uc.repo.FindByEmail(email)
-	if err != nil && !errors.Is(err, domain.ErrUserNotFound) {
-		return nil, err // Propagate DB errors
-	}
-	if existing != nil {
-		return nil, domain.ErrUserExists
+	// Check if user already exists (business rule enforcement)
+	existingUser, err := uc.userRepo.FindByEmail(ctx, siteID, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
 	}
 
-	// Create (transactional in real impl)
-	if err := uc.repo.Create(user); err != nil {
-		return nil, err
+	if existingUser != nil {
+		return nil, domain.ErrUserAlreadyExists
+	}
+
+	// Persist the user
+	if err := uc.userRepo.Create(ctx, user); err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	return user, nil
 }
 
-// Login: Query - Verify & gen token
-func (uc *UserUsecase) Login(ctx context.Context, email, password string) (string, error) {
-	user, err := uc.repo.FindByEmail(email)
+// GetUserByEmail retrieves a user by email within a specific site
+func (uc *UserUseCase) GetUserByEmail(ctx context.Context, siteID uuid.UUID, email string) (*domain.User, error) {
+	// Check context early
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	// Validate input parameters
+	if siteID == uuid.Nil {
+		return nil, fmt.Errorf("invalid site ID: cannot be nil")
+	}
+
+	if email == "" {
+		return nil, fmt.Errorf("invalid email: cannot be empty")
+	}
+
+	// Retrieve user from repository
+	user, err := uc.userRepo.FindByEmail(ctx, siteID, email)
 	if err != nil {
-		return "", err // Includes ErrUserNotFound
+		return nil, fmt.Errorf("failed to find user: %w", err)
 	}
 
-	if !user.CheckPassword(password) {
-		return "", domain.ErrWrongPassword
+	return user, nil
+}
+
+// IsEmailAvailable checks if an email is available within a site
+func (uc *UserUseCase) IsEmailAvailable(ctx context.Context, siteID uuid.UUID, email string) (bool, error) {
+	// Check context
+	if ctx.Err() != nil {
+		return false, ctx.Err()
 	}
 
-	// Gen JWT (stub - full in pkg/auth với claims: userID, role, exp)
-	token, err := auth.GenerateJWT(user.ID.String(), user.Role)
+	// Validate parameters
+	if siteID == uuid.Nil {
+		return false, fmt.Errorf("invalid site ID: cannot be nil")
+	}
+
+	if email == "" {
+		return false, fmt.Errorf("invalid email: cannot be empty")
+	}
+
+	// Check if user exists
+	user, err := uc.userRepo.FindByEmail(ctx, siteID, email)
 	if err != nil {
-		return "", err
+		return false, fmt.Errorf("failed to check email availability: %w", err)
 	}
 
-	return token, nil
+	return user == nil, nil
 }

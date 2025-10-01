@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-01
 - golang-migrate (DB migrations)
 - bcrypt, JWT (authentication with rate limiting)
 - Docker (zero-downtime rolling deployments)
+- Go 1.25+ + GORM v1.26+ (ORM), Testify (testing), UUID package (unique identifiers), bcrypt (password hashing) (003-define-user-domain)
+- PostgreSQL 16+ with GORM ORM, golang-migrate for migrations (003-define-user-domain)
 
 ## Project Structure (Modular Monolith)
 ```
@@ -50,6 +52,7 @@ migrations/         # golang-migrate DB schemas
 - Lean MVP: 500-1000 LOC, YAGNI principles
 
 ## Recent Changes
+- 003-define-user-domain: Added Go 1.25+ + GORM v1.26+ (ORM), Testify (testing), UUID package (unique identifiers), bcrypt (password hashing)
 - Constitution v1.1.0: Expanded with modular monolith, performance targets, security requirements, lean MVP principles
 
 <!-- MANUAL ADDITIONS START -->
