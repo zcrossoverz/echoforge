@@ -1,0 +1,15 @@
+# configs/config.yaml
+server:
+  port: 8080
+  mode: debug  # Gin mode: release cho prod
+
+database:
+  url: "postgres://postgres:password@localhost:5432/echoforge?sslmode=disable"  # Env override: DATABASE_URL
+
+jwt:
+  secret: "super-secret-key-change-in-prod"  # Min 32 chars, rotate quarterly
+  expires_in: 24  # Hours
+
+app:
+  site_id: "default"  # Override per-site: blog1, story1
+  log_level: "info"   # Zerolog level
