@@ -13,20 +13,24 @@
    → contracts/: Each file → contract test task
    → research.md: Extract decisions → setup tasks
 3. Generate tasks by category:
-   → Setup: project init, dependencies (GORM, Gin, Testify, bcrypt, JWT), linting
-   → Tests: contract tests, integration tests (TDD with Testify required)
-   → Core: domain models, services, adapters (hexagonal)
-   → Integration: DB (GORM/Postgres), middleware, logging
-   → Security: auth (bcrypt+JWT), tenant isolation (site_id)
-   → Polish: unit tests, performance, docs
+   → Setup: Go 1.25+, GORM v1.26+, Gin v1.10+, Testify, Wire DI, golang-migrate
+   → Tests: TDD with Testify (80%+ coverage), contract tests, integration tests
+   → Core: domain entities (internal/domain), use cases (internal/usecase), DI setup
+   → Adapters: GORM persistence, Gin HTTP APIs (/api/v1/), Zap logging
+   → Security: bcrypt+JWT auth, rate limiting, OWASP compliance, input validation
+   → Multi-tenant: site_id isolation in config and DB queries
+   → Performance: concurrency optimization, DB indexing, Docker deployment
+   → Polish: SemVer compliance, backward compatibility, documentation
 4. Apply task rules:
    → Different files = mark [P] for parallel
    → Same file = sequential (no [P])
-   → Tests before implementation (TDD, Testify)
-   → All persistence tasks must use GORM/Postgres
-   → All API tasks must use Gin
-   → All auth tasks must use bcrypt+JWT
+   → Tests before implementation (TDD, 80%+ coverage)
+   → All persistence tasks must use GORM v1.26+ with golang-migrate
+   → All API tasks must use Gin v1.10+ with versioned endpoints
+   → All auth tasks must use bcrypt+JWT with unique email, rate limiting
    → All multi-tenant tasks must enforce site_id isolation
+   → All features must maintain backward compatibility (SemVer)
+   → Performance tasks must target 1000+ concurrent users/site
 5. Number tasks sequentially (T001, T002...)
 6. Generate dependency graph
 7. Create parallel execution examples

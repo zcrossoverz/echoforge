@@ -36,11 +36,15 @@
 - **Mandatory sections**: Must be completed for every feature
 - **Optional sections**: Include only when relevant to the feature
 - When a section doesn't apply, remove it entirely (don't leave as "N/A")
-- All requirements must be testable (TDD enforced)
-- If feature involves persistence, must use GORM/Postgres
-- If feature exposes HTTP API, must use Gin
-- If feature involves authentication, must use bcrypt+JWT and support scalability
+- All requirements must be testable (TDD enforced, 80%+ coverage)
+- If feature involves persistence, must use GORM v1.26+ with Postgres 16+
+- If feature exposes HTTP API, must use Gin v1.10+ with versioned endpoints
+- If feature involves authentication, must use bcrypt+JWT with unique email, rate limiting
 - If feature involves multi-tenancy, must enforce tenant isolation via `site_id`
+- Performance requirements must support 1000+ concurrent users per site
+- Security requirements must comply with OWASP Top 10
+- Features must maintain backward compatibility (SemVer)
+- Lean MVP approach: justify complexity, prefer YAGNI principles
 
 ### For AI Generation
 When creating this spec from a user prompt:

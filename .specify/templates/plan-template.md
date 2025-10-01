@@ -47,16 +47,19 @@
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- Hexagonal architecture enforced (domain logic isolated, adapters only for I/O)
-- GORM required for all Postgres persistence
-- Gin required for all HTTP APIs
-- TDD with Testify required for all new code/bugfixes
-- Multi-site tenant isolation via `site_id` required
-- Auth must use bcrypt (passwords) and JWT (sessions), scalable and secure
-- All dependencies documented in go.mod
-- Peer review and passing tests required for merge
-- Feature branches follow `[###-feature-name]`
-- Security review for all auth changes
+- Modular monolith with hexagonal architecture (domain in internal/domain, adapters separated)
+- GORM v1.26+ with golang-migrate required for all Postgres persistence
+- Gin v1.10+ with versioned APIs (/api/v1/) required for all HTTP endpoints
+- TDD with Testify required, 80%+ test coverage mandatory
+- Multi-site tenant isolation via `site_id` in config and DB queries
+- Auth: bcrypt + JWT with unique email constraint, rate limiting required
+- Reusable core design: config override without core modification
+- SemVer compliance: backward compatibility for API/config changes
+- Performance: 1000+ concurrent users/site capability
+- Security: OWASP Top 10 compliance, input validation
+- Lean MVP: 500-1000 LOC limit, YAGNI principles
+- All dependencies documented in go.mod with version constraints
+- Zero-downtime deployments via Docker rolling updates
 
 ## Project Structure
 
