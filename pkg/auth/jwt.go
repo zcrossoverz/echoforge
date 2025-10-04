@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/zcrossoverz/echoforge/internal/config"
 )
 
 // JWTClaims represents the custom claims for JWT tokens (clone-and-extend model)
@@ -41,6 +42,11 @@ func GenerateToken(userID uuid.UUID, secret string) (string, time.Time, error) {
 	return tokenString, expirationTime, nil
 }
 
+// GenerateTokenWithConfig generates a JWT token using the application configuration
+func GenerateTokenWithConfig(userID uuid.UUID, cfg *config.Config) (string, time.Time, error) {
+	return GenerateToken(userID, cfg.JWTSecret)
+}
+
 // ValidateToken validates a JWT token and returns the claims
 func ValidateToken(tokenString, secret string) (*JWTClaims, error) {
 	if secret == "" {
@@ -64,6 +70,38 @@ func ValidateToken(tokenString, secret string) (*JWTClaims, error) {
 	}
 
 	return nil, errors.New("invalid token")
+}
+
+// ValidateTokenWithConfig validates a JWT token using the application configuration
+func ValidateTokenWithConfig(tokenString string, cfg *config.Config) (*JWTClaims, error) {
+	return ValidateToken(tokenString, cfg.JWTSecret)
+}
+
+// JWTService provides JWT operations with configuration injection
+type JWTService struct {
+	config *config.Config
+}
+
+// NewJWTService creates a new JWT service with configuration
+func NewJWTService(cfg *config.Config) *JWTService {
+	return &JWTService{
+		config: cfg,
+	}
+}
+
+// GenerateToken generates a JWT token using the service's configuration
+func (s *JWTService) GenerateToken(userID uuid.UUID) (string, time.Time, error) {
+	return GenerateToken(userID, s.config.JWTSecret)
+}
+
+// ValidateToken validates a JWT token using the service's configuration
+func (s *JWTService) ValidateToken(tokenString string) (*JWTClaims, error) {
+	return ValidateToken(tokenString, s.config.JWTSecret)
+}
+
+// GetSecret returns the JWT secret from configuration (for backward compatibility)
+func (s *JWTService) GetSecret() string {
+	return s.config.JWTSecret
 }
 
 // Legacy function for backward compatibility

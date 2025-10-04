@@ -62,7 +62,7 @@ func TestUserRepository_Create_SameEmailDifferentSites(t *testing.T) {
 	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
 	// Create user in site A
-	userA, err := domain.NewUser(siteA, email, passwordHash)
+	userA, err := domain.NewUser(email, passwordHash)
 	require.NoError(t, err)
 	err = repo.Create(ctx, userA)
 	require.NoError(t, err)

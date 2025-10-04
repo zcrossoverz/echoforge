@@ -11,8 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/google/wire"
-	"github.com/spf13/viper"
-	"github.com/zcrossoverz/echoforge/pkg/common"
+	"github.com/zcrossoverz/echoforge/internal/config"
+	"github.com/zcrossoverz/echoforge/internal/logging"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
@@ -20,20 +20,21 @@ import (
 )
 
 func main() {
-	// Initialize Viper configuration
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath("./configs")
-	viper.SetDefault("port", "8080")
-	viper.SetDefault("log_level", "info")
-	viper.SetDefault("site_id", "default")
-
-	if err := viper.ReadInConfig(); err != nil {
-		// Config file not found, use defaults
+	// Load configuration using our new config system
+	cfg, err := config.NewConfig()
+	if err != nil {
+		panic("Failed to load configuration: " + err.Error())
 	}
 
-	// Setup logger with config level
-	logger := common.WithConfig(viper.GetString("log_level"))
+	// Create logger using our new logging system
+	logConfig := &logging.SimpleConfig{
+		LogLevel:    cfg.LogLevel,
+		Development: false,
+	}
+	logger, err := logging.NewLogger(logConfig)
+	if err != nil {
+		panic("Failed to create logger: " + err.Error())
+	}
 	defer logger.Sync() // Flush buffered logs
 
 	// Generate unique server ID
@@ -41,9 +42,8 @@ func main() {
 
 	logger.Info("app starting",
 		zap.String("server_id", serverID),
-		zap.String("site_id", viper.GetString("site_id")),
-		zap.String("port", viper.GetString("port")),
-		zap.String("mode", viper.GetString("mode")),
+		zap.String("log_level", cfg.LogLevel),
+		zap.Bool("hot_reload", cfg.EnableHotReload),
 	)
 
 	// Demonstrate bcrypt usage
@@ -64,15 +64,11 @@ func main() {
 		c.JSON(200, gin.H{
 			"status":    "ok",
 			"server_id": serverID,
-			"site_id":   viper.GetString("site_id"),
 		})
 	})
 
-	// Database connection placeholder
-	dsn := viper.GetString("database.dsn")
-	if dsn == "" {
-		dsn = "host=localhost user=echoforge password=echoforge dbname=echoforge port=5432 sslmode=disable"
-	}
+	// Database connection using config
+	dsn := cfg.DBDSN
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -92,7 +88,10 @@ func main() {
 
 	// Start HTTP server in goroutine
 	go func() {
-		port := viper.GetString("port")
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080" // Default port
+		}
 		logger.Info("HTTP server starting", zap.String("port", port))
 		if err := router.Run(":" + port); err != nil {
 			logger.Error("Server failed to start", zap.Error(err))
