@@ -19,7 +19,6 @@ func TestLoginUsecase_Success(t *testing.T) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	assert.NoError(t, err)
 
-	siteID := uuid.New()
 	userID := uuid.New()
 	email := "test@example.com"
 
@@ -27,7 +26,6 @@ func TestLoginUsecase_Success(t *testing.T) {
 		users: []*domain.User{
 			{
 				ID:           userID,
-				SiteID:       siteID,
 				Email:        email,
 				PasswordHash: string(hashedPassword),
 				CreatedAt:    time.Now(),
@@ -41,7 +39,6 @@ func TestLoginUsecase_Success(t *testing.T) {
 
 	ctx := context.Background()
 	input := LoginInput{
-		SiteID:   siteID,
 		Email:    email,
 		Password: password,
 	}
@@ -49,12 +46,11 @@ func TestLoginUsecase_Success(t *testing.T) {
 	// Execute
 	result, err := loginUC.Execute(ctx, input)
 
-	// Validate - These assertions will fail until T014 is implemented
+	// Validate - These assertions will fail until implementation is updated
 	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, userID, result.User.ID)
 	assert.Equal(t, email, result.User.Email)
-	assert.Equal(t, siteID, result.User.SiteID)
 	assert.NotEmpty(t, result.Token)
 	assert.True(t, result.ExpiresAt.After(time.Now()))
 }
@@ -67,7 +63,7 @@ func TestLoginUsecase_UserNotFound(t *testing.T) {
 
 	ctx := context.Background()
 	input := LoginInput{
-		SiteID:   uuid.New(),
+
 		Email:    "nonexistent@example.com",
 		Password: "password123",
 	}
@@ -87,14 +83,13 @@ func TestLoginUsecase_IncorrectPassword(t *testing.T) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(correctPassword), bcrypt.DefaultCost)
 	assert.NoError(t, err)
 
-	siteID := uuid.New()
 	email := "test@example.com"
 
 	mockRepo := &MockUserRepository{
 		users: []*domain.User{
 			{
-				ID:           uuid.New(),
-				SiteID:       siteID,
+				ID: uuid.New(),
+
 				Email:        email,
 				PasswordHash: string(hashedPassword),
 				CreatedAt:    time.Now(),
@@ -108,7 +103,7 @@ func TestLoginUsecase_IncorrectPassword(t *testing.T) {
 
 	ctx := context.Background()
 	input := LoginInput{
-		SiteID:   siteID,
+
 		Email:    email,
 		Password: "wrongpassword123", // Incorrect password
 	}
@@ -122,48 +117,8 @@ func TestLoginUsecase_IncorrectPassword(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid credentials")
 }
 
-func TestLoginUsecase_SiteIsolation(t *testing.T) {
-	// Setup
-	password := "securepass123"
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	assert.NoError(t, err)
-
-	siteA := uuid.New()
-	siteB := uuid.New()
-	email := "user@example.com"
-
-	// User exists in site A only
-	mockRepo := &MockUserRepository{
-		users: []*domain.User{
-			{
-				ID:           uuid.New(),
-				SiteID:       siteA,
-				Email:        email,
-				PasswordHash: string(hashedPassword),
-				CreatedAt:    time.Now(),
-				UpdatedAt:    time.Now(),
-			},
-		},
-	}
-
-	loginUC := NewLoginUsecase(mockRepo, "test-secret-key-at-least-32-characters")
-	defer mockRepo.Reset()
-
-	ctx := context.Background()
-	input := LoginInput{
-		SiteID:   siteB, // Trying to login to site B
-		Email:    email,
-		Password: password,
-	}
-
-	// Execute
-	result, err := loginUC.Execute(ctx, input)
-
-	// Validate - Should fail because user doesn't exist in site B
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "invalid credentials")
-}
+// Note: SiteIsolation test removed - not applicable in clone-and-extend model
+// Each site runs separate database instances, providing natural isolation
 
 func TestLoginUsecase_ContextCancellation(t *testing.T) {
 	// Setup
@@ -175,7 +130,7 @@ func TestLoginUsecase_ContextCancellation(t *testing.T) {
 	cancel() // Cancel context immediately
 
 	input := LoginInput{
-		SiteID:   uuid.New(),
+
 		Email:    "test@example.com",
 		Password: "password123",
 	}
@@ -199,7 +154,7 @@ func TestLoginUsecase_RepositoryError(t *testing.T) {
 
 	ctx := context.Background()
 	input := LoginInput{
-		SiteID:   uuid.New(),
+
 		Email:    "test@example.com",
 		Password: "password123",
 	}
@@ -227,7 +182,7 @@ func TestLoginUsecase_InvalidInput(t *testing.T) {
 		{
 			name: "empty site ID",
 			input: LoginInput{
-				SiteID:   uuid.Nil,
+
 				Email:    "test@example.com",
 				Password: "password123",
 			},
@@ -235,7 +190,7 @@ func TestLoginUsecase_InvalidInput(t *testing.T) {
 		{
 			name: "empty email",
 			input: LoginInput{
-				SiteID:   uuid.New(),
+
 				Email:    "",
 				Password: "password123",
 			},
@@ -243,7 +198,7 @@ func TestLoginUsecase_InvalidInput(t *testing.T) {
 		{
 			name: "invalid email format",
 			input: LoginInput{
-				SiteID:   uuid.New(),
+
 				Email:    "invalid-email",
 				Password: "password123",
 			},
@@ -251,7 +206,7 @@ func TestLoginUsecase_InvalidInput(t *testing.T) {
 		{
 			name: "empty password",
 			input: LoginInput{
-				SiteID:   uuid.New(),
+
 				Email:    "test@example.com",
 				Password: "",
 			},
@@ -276,15 +231,14 @@ func TestLoginUsecase_JWTTokenValidation(t *testing.T) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	assert.NoError(t, err)
 
-	siteID := uuid.New()
 	userID := uuid.New()
 	email := "test@example.com"
 
 	mockRepo := &MockUserRepository{
 		users: []*domain.User{
 			{
-				ID:           userID,
-				SiteID:       siteID,
+				ID: userID,
+
 				Email:        email,
 				PasswordHash: string(hashedPassword),
 				CreatedAt:    time.Now(),
@@ -299,7 +253,7 @@ func TestLoginUsecase_JWTTokenValidation(t *testing.T) {
 
 	ctx := context.Background()
 	input := LoginInput{
-		SiteID:   siteID,
+
 		Email:    email,
 		Password: password,
 	}

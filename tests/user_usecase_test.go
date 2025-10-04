@@ -18,15 +18,13 @@ func TestUserUseCase_CreateUser_Success(t *testing.T) {
 	userUseCase := usecase.NewUserUseCase(mockRepo)
 	ctx := context.Background()
 
-	siteID := uuid.New()
 	email := "new@example.com"
 	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
-	createdUser, err := userUseCase.CreateUser(ctx, siteID, email, passwordHash)
+	createdUser, err := userUseCase.CreateUser(ctx, email, passwordHash)
 
 	assert.NoError(t, err)
 	require.NotNil(t, createdUser)
-	assert.Equal(t, siteID, createdUser.SiteID)
 	assert.Equal(t, email, createdUser.Email)
 	assert.Equal(t, passwordHash, createdUser.PasswordHash)
 	assert.NotEqual(t, uuid.Nil, createdUser.ID)
@@ -39,11 +37,10 @@ func TestUserUseCase_CreateUser_InvalidEmail(t *testing.T) {
 	userUseCase := usecase.NewUserUseCase(mockRepo)
 	ctx := context.Background()
 
-	siteID := uuid.New()
 	invalidEmail := "invalid-email"
 	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
-	user, err := userUseCase.CreateUser(ctx, siteID, invalidEmail, passwordHash)
+	user, err := userUseCase.CreateUser(ctx, invalidEmail, passwordHash)
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -56,11 +53,10 @@ func TestUserUseCase_CreateUser_WeakPasswordHash(t *testing.T) {
 	userUseCase := usecase.NewUserUseCase(mockRepo)
 	ctx := context.Background()
 
-	siteID := uuid.New()
 	email := "valid@example.com"
 	weakPasswordHash := "short_hash"
 
-	user, err := userUseCase.CreateUser(ctx, siteID, email, weakPasswordHash)
+	user, err := userUseCase.CreateUser(ctx, email, weakPasswordHash)
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -73,17 +69,16 @@ func TestUserUseCase_CreateUser_DuplicateEmail(t *testing.T) {
 	userUseCase := usecase.NewUserUseCase(mockRepo)
 	ctx := context.Background()
 
-	siteID := uuid.New()
 	email := "duplicate@example.com"
 	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
 	// Create first user
-	user1, err := userUseCase.CreateUser(ctx, siteID, email, passwordHash)
+	user1, err := userUseCase.CreateUser(ctx, email, passwordHash)
 	require.NoError(t, err)
 	require.NotNil(t, user1)
 
-	// Try to create second user with same email in same site
-	user2, err := userUseCase.CreateUser(ctx, siteID, email, passwordHash)
+	// Try to create second user with same email
+	user2, err := userUseCase.CreateUser(ctx, email, passwordHash)
 
 	assert.ErrorIs(t, err, domain.ErrUserAlreadyExists)
 	assert.Nil(t, user2)
@@ -96,21 +91,19 @@ func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
 	userUseCase := usecase.NewUserUseCase(mockRepo)
 	ctx := context.Background()
 
-	siteID := uuid.New()
 	email := "existing@example.com"
 	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
 	// Create user first
-	createdUser, err := userUseCase.CreateUser(ctx, siteID, email, passwordHash)
+	createdUser, err := userUseCase.CreateUser(ctx, email, passwordHash)
 	require.NoError(t, err)
 
 	// Retrieve user by email
-	foundUser, err := userUseCase.GetUserByEmail(ctx, siteID, email)
+	foundUser, err := userUseCase.GetUserByEmail(ctx, email)
 
 	assert.NoError(t, err)
 	require.NotNil(t, foundUser)
 	assert.Equal(t, createdUser.ID, foundUser.ID)
-	assert.Equal(t, createdUser.SiteID, foundUser.SiteID)
 	assert.Equal(t, createdUser.Email, foundUser.Email)
 	assert.Equal(t, createdUser.PasswordHash, foundUser.PasswordHash)
 	assert.Equal(t, 2, mockRepo.CallCount("FindByEmail")) // CreateUser checks availability + GetUserByEmail retrieves

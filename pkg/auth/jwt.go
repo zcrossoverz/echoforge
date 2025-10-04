@@ -10,15 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-// JWTClaims represents the custom claims for JWT tokens
+// JWTClaims represents the custom claims for JWT tokens (clone-and-extend model)
 type JWTClaims struct {
-	UserID string `json:"sub"`     // Subject: User ID
-	SiteID string `json:"site_id"` // Custom: Site ID for multi-tenant isolation
+	UserID string `json:"sub"` // Subject: User ID only
 	jwt.RegisteredClaims
 }
 
-// GenerateToken generates a JWT token with user and site claims
-func GenerateToken(userID, siteID uuid.UUID, secret string) (string, time.Time, error) {
+// GenerateToken generates a JWT token with user claims only (clone-and-extend model)
+func GenerateToken(userID uuid.UUID, secret string) (string, time.Time, error) {
 	if secret == "" {
 		return "", time.Time{}, errors.New("JWT secret cannot be empty")
 	}
@@ -27,7 +26,6 @@ func GenerateToken(userID, siteID uuid.UUID, secret string) (string, time.Time, 
 
 	claims := &JWTClaims{
 		UserID: userID.String(),
-		SiteID: siteID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -13,7 +13,7 @@ Echoforge is a modular monolith backend service designed to power multiple conte
 ### 🎯 Key Features
 
 - **Modular Monolith**: Clean separation between domain, use cases, and adapters
-- **Multi-tenant**: Site-based isolation with `site_id` for 10+ sites
+- **Clone-and-Extend**: Each site runs as separate instance with dedicated database (v2.0+ refactor)
 - **Hexagonal Architecture**: Domain-driven design with ports & adapters pattern
 - **Lean Binary**: Optimized builds under 20MB
 - **TDD Approach**: 80%+ test coverage requirement
@@ -51,7 +51,7 @@ echoforge/
 ├── pkg/
 │   ├── auth/           # JWT, bcrypt utilities
 │   └── common/         # Shared utilities (logger config)
-├── configs/            # Multi-site configuration (site_id)
+├── configs/            # Site configuration (clone-and-extend model)
 ├── tests/              # TDD tests (contract, integration, unit)
 ├── migrations/         # Database schema migrations
 └── docs/              # Project documentation
@@ -95,7 +95,7 @@ Create a `configs/config.yaml` file:
 ```yaml
 port: "8080"
 log_level: "info"
-site_id: "your-site-id"
+site_id: "your-site-name"  # For operational identification only
 mode: "development"
 
 database:
@@ -183,15 +183,21 @@ CMD ["./echoforge"]
 - **Use Case Layer** (`internal/usecase/`): Business logic orchestration with dependency injection
 - **Adapter Layer** (`internal/adapters/`): External concerns (HTTP, database, logging)
 
-### Multi-Tenancy
+### Clone-and-Extend Architecture
 
-All database queries include `site_id` for tenant isolation:
+Each site clones the core repository and runs with its own database:
 
 ```go
-// Example: Site-isolated user query
+// Example: Simple user query (no site filtering needed)
 users := []User{}
-db.Where("site_id = ?", siteID).Find(&users)
+db.Find(&users)  // Each site has its own database
 ```
+
+**Benefits**:
+- Natural data isolation per site
+- Simplified queries (no site_id joins)  
+- Independent scaling and deployment
+- Core updates via `go get` (SemVer)
 
 ## 📊 Performance Targets
 
@@ -223,7 +229,7 @@ db.Where("site_id = ?", siteID).Find(&users)
 ```bash
 export PORT=8080
 export LOG_LEVEL=info
-export SITE_ID=production-site
+export SITE_ID=my-blog-site  # Operational identifier
 export DATABASE_DSN="host=db user=echoforge password=secure dbname=echoforge sslmode=require"
 ```
 

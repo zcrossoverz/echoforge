@@ -7,17 +7,15 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/zcrossoverz/echoforge/internal/domain"
 	"github.com/zcrossoverz/echoforge/pkg/auth"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// LoginInput represents the input for user login
+// LoginInput represents the input for user login (clone-and-extend model)
 type LoginInput struct {
-	SiteID   uuid.UUID `json:"site_id" validate:"required"`
-	Email    string    `json:"email" validate:"required,email,max=320"`
-	Password string    `json:"password" validate:"required,max=128"`
+	Email    string `json:"email" validate:"required,email,max=320"`
+	Password string `json:"password" validate:"required,max=128"`
 }
 
 // AuthenticationResult represents the result of successful authentication
@@ -71,8 +69,8 @@ func (uc *LoginUsecaseImpl) Execute(ctx context.Context, input LoginInput) (*Aut
 		return nil, fmt.Errorf("input validation failed: %w", err)
 	}
 
-	// Find user by email and site (multi-tenant isolation)
-	user, err := uc.userRepo.FindByEmail(ctx, input.SiteID, input.Email)
+	// Find user by email (clone-and-extend: no site isolation needed)
+	user, err := uc.userRepo.FindByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
@@ -85,8 +83,8 @@ func (uc *LoginUsecaseImpl) Execute(ctx context.Context, input LoginInput) (*Aut
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Generate JWT token using auth utilities
-	token, expiresAt, err := auth.GenerateToken(user.ID, user.SiteID, uc.jwtSecret)
+	// Generate JWT token using auth utilities (user-only claims)
+	token, expiresAt, err := auth.GenerateToken(user.ID, uc.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}

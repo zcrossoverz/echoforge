@@ -3,13 +3,12 @@ package tests
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/zcrossoverz/echoforge/internal/domain"
 )
 
 // MockUserRepository implements domain.UserRepository for testing
 type MockUserRepository struct {
-	users map[string]*domain.User // key: siteID+email
+	users map[string]*domain.User // key: email
 	calls map[string]int          // method call counts
 }
 
@@ -35,7 +34,7 @@ func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) erro
 		return err
 	}
 
-	key := user.SiteID.String() + ":" + user.Email
+	key := user.Email
 	if _, exists := m.users[key]; exists {
 		return domain.ErrUserAlreadyExists
 	}
@@ -43,7 +42,6 @@ func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) erro
 	// Create a copy to avoid mutations
 	userCopy := &domain.User{
 		ID:           user.ID,
-		SiteID:       user.SiteID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt,
@@ -54,18 +52,18 @@ func (m *MockUserRepository) Create(ctx context.Context, user *domain.User) erro
 	return nil
 }
 
-func (m *MockUserRepository) FindByEmail(ctx context.Context, siteID uuid.UUID, email string) (*domain.User, error) {
+func (m *MockUserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	m.calls["FindByEmail"]++
 
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	if siteID == uuid.Nil || email == "" {
+	if email == "" {
 		return nil, domain.ErrRepositoryFailure
 	}
 
-	key := siteID.String() + ":" + email
+	key := email
 	user, exists := m.users[key]
 	if !exists {
 		return nil, nil
@@ -74,7 +72,6 @@ func (m *MockUserRepository) FindByEmail(ctx context.Context, siteID uuid.UUID, 
 	// Return a copy to avoid mutations
 	userCopy := &domain.User{
 		ID:           user.ID,
-		SiteID:       user.SiteID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt,
@@ -100,7 +97,6 @@ func (m *MockUserRepository) GetAllUsers() map[string]*domain.User {
 	for key, user := range m.users {
 		result[key] = &domain.User{
 			ID:           user.ID,
-			SiteID:       user.SiteID,
 			Email:        user.Email,
 			PasswordHash: user.PasswordHash,
 			CreatedAt:    user.CreatedAt,
@@ -115,21 +111,9 @@ func (m *MockUserRepository) CountUsers() int {
 	return len(m.users)
 }
 
-// CountUsersBySite returns the number of users for a specific site
-func (m *MockUserRepository) CountUsersBySite(siteID uuid.UUID) int {
-	count := 0
-	prefix := siteID.String() + ":"
-	for key := range m.users {
-		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
-			count++
-		}
-	}
-	return count
-}
-
 // DeleteUser removes a user (for test cleanup)
-func (m *MockUserRepository) DeleteUser(siteID uuid.UUID, email string) bool {
-	key := siteID.String() + ":" + email
+func (m *MockUserRepository) DeleteUser(email string) bool {
+	key := email
 	if _, exists := m.users[key]; exists {
 		delete(m.users, key)
 		return true
@@ -138,8 +122,8 @@ func (m *MockUserRepository) DeleteUser(siteID uuid.UUID, email string) bool {
 }
 
 // CorruptUser simulates data corruption for error testing
-func (m *MockUserRepository) CorruptUser(siteID uuid.UUID, email string) {
-	key := siteID.String() + ":" + email
+func (m *MockUserRepository) CorruptUser(email string) {
+	key := email
 	if user, exists := m.users[key]; exists {
 		// Corrupt the user data
 		user.Email = "corrupted"

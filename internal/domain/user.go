@@ -10,10 +10,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// User represents a registered user within a site context
+// User represents a registered user in clone-and-extend model (site_id removed)
 type User struct {
 	ID           uuid.UUID `json:"id"`
-	SiteID       uuid.UUID `json:"site_id"`
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"password_hash"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -35,17 +34,16 @@ var (
 	ErrEmailTooLong         = errors.New("email exceeds maximum length")
 	ErrPasswordHashTooShort = errors.New("password hash too short")
 	ErrRequiredField        = errors.New("required field is empty")
-	ErrUserAlreadyExists    = errors.New("user already exists with this email in site")
+	ErrUserAlreadyExists    = errors.New("user already exists with this email")
 	ErrRepositoryFailure    = errors.New("repository operation failed")
 )
 
-// NewUser creates a new User entity with validation
-func NewUser(siteID uuid.UUID, email, passwordHash string) (*User, error) {
+// NewUser creates a new User entity with validation (clone-and-extend model)
+func NewUser(email, passwordHash string) (*User, error) {
 	now := time.Now()
 
 	user := &User{
 		ID:           uuid.New(),
-		SiteID:       siteID,
 		Email:        email,
 		PasswordHash: passwordHash,
 		CreatedAt:    now,
@@ -59,14 +57,11 @@ func NewUser(siteID uuid.UUID, email, passwordHash string) (*User, error) {
 	return user, nil
 }
 
-// Validate performs business rule validation
+// Validate performs business rule validation (clone-and-extend model)
 func (u *User) Validate() error {
 	// Required fields
 	if u.ID == uuid.Nil {
 		return fmt.Errorf("ID: %w", ErrRequiredField)
-	}
-	if u.SiteID == uuid.Nil {
-		return fmt.Errorf("SiteID: %w", ErrRequiredField)
 	}
 	if u.Email == "" {
 		return fmt.Errorf("Email: %w", ErrRequiredField)
@@ -96,11 +91,11 @@ func (u *User) IsValid() bool {
 	return u.Validate() == nil
 }
 
-// UserRepository defines the persistence contract for User entities
+// UserRepository defines the persistence contract for User entities (clone-and-extend model)
 type UserRepository interface {
 	// Create persists a new user entity
 	Create(ctx context.Context, user *User) error
 
-	// FindByEmail retrieves a user by email within specific site
-	FindByEmail(ctx context.Context, siteID uuid.UUID, email string) (*User, error)
+	// FindByEmail retrieves a user by email (global uniqueness in clone)
+	FindByEmail(ctx context.Context, email string) (*User, error)
 }

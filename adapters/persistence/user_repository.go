@@ -15,8 +15,7 @@ import (
 // GormUser represents the database model for users
 type GormUser struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	SiteID       uuid.UUID `gorm:"type:uuid;not null;index:idx_users_site_id"`
-	Email        string    `gorm:"type:varchar(255);not null;index:idx_users_site_email,priority:2"`
+	Email        string    `gorm:"type:varchar(255);not null;uniqueIndex"`
 	PasswordHash string    `gorm:"type:varchar(60);not null"`
 	CreatedAt    int64     `gorm:"autoCreateTime"`
 	UpdatedAt    int64     `gorm:"autoUpdateTime"`
@@ -57,7 +56,6 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	// Convert domain entity to GORM model
 	gormUser := &GormUser{
 		ID:           user.ID,
-		SiteID:       user.SiteID,
 		Email:        user.Email,
 		PasswordHash: user.PasswordHash,
 		CreatedAt:    user.CreatedAt.Unix(),
@@ -77,14 +75,10 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
-// FindByEmail retrieves a user by email within specific site
-func (r *UserRepository) FindByEmail(ctx context.Context, siteID uuid.UUID, email string) (*domain.User, error) {
+// FindByEmail retrieves a user by email
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
-	}
-
-	if siteID == uuid.Nil {
-		return nil, fmt.Errorf("siteID cannot be nil: %w", domain.ErrRepositoryFailure)
 	}
 
 	if email == "" {
@@ -93,7 +87,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, siteID uuid.UUID, emai
 
 	var gormUser GormUser
 	result := r.db.WithContext(ctx).
-		Where("site_id = ? AND email = ?", siteID, email).
+		Where("email = ?", email).
 		First(&gormUser)
 
 	if result.Error != nil {
@@ -106,7 +100,6 @@ func (r *UserRepository) FindByEmail(ctx context.Context, siteID uuid.UUID, emai
 	// Convert GORM model to domain entity
 	domainUser := &domain.User{
 		ID:           gormUser.ID,
-		SiteID:       gormUser.SiteID,
 		Email:        gormUser.Email,
 		PasswordHash: gormUser.PasswordHash,
 		CreatedAt:    unixToTime(gormUser.CreatedAt),
