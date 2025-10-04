@@ -1,119 +1,118 @@
-// cmd/server/main.go
 package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/google/wire"
-	"github.com/zcrossoverz/echoforge/internal/config"
-	"github.com/zcrossoverz/echoforge/internal/logging"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 func main() {
-	// Load configuration using our new config system
-	cfg, err := config.NewConfig()
+	// Initialize application using Wire dependency injection
+	app, err := InitializeApplication()
 	if err != nil {
-		panic("Failed to load configuration: " + err.Error())
+		panic(fmt.Sprintf("Failed to initialize application: %v", err))
 	}
 
-	// Create logger using our new logging system
-	logConfig := &logging.SimpleConfig{
-		LogLevel:    cfg.LogLevel,
-		Development: false,
-	}
-	logger, err := logging.NewLogger(logConfig)
-	if err != nil {
-		panic("Failed to create logger: " + err.Error())
-	}
-	defer logger.Sync() // Flush buffered logs
-
-	// Generate unique server ID
+	// Generate unique server ID for tracking
 	serverID := uuid.New().String()
 
-	logger.Info("app starting",
+	app.Logger.Info("Echoforge server starting",
 		zap.String("server_id", serverID),
-		zap.String("log_level", cfg.LogLevel),
-		zap.Bool("hot_reload", cfg.EnableHotReload),
+		zap.String("log_level", app.Config.LogLevel),
+		zap.String("environment", getEnvironment()),
+		zap.String("version", "1.0.0"),
 	)
 
-	// Demonstrate bcrypt usage
-	testPassword := "test_password"
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(testPassword), bcrypt.DefaultCost)
-	if err != nil {
-		logger.Error("Password hashing failed", zap.Error(err))
-	} else {
-		logger.Info("Password hashing successful", zap.Int("hash_length", len(hashedPassword)))
+	// Validate configuration
+	if err := ValidateServerConfig(app.Config); err != nil {
+		app.Logger.Fatal("Configuration validation failed", zap.Error(err))
 	}
 
-	// Initialize Gin router
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
-
-	// Basic health check endpoint
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":    "ok",
-			"server_id": serverID,
-		})
-	})
-
-	// Database connection using config
-	dsn := cfg.DBDSN
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		logger.Info("Database connection failed (expected without DB setup)", zap.Error(err))
-	} else {
-		logger.Info("Database connected successfully")
-		// Use db to prevent unused variable error
-		_ = db
+	// Setup HTTP server
+	server := &http.Server{
+		Addr:           fmt.Sprintf(":%s", getPort()),
+		Handler:        app.Router,
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1MB
 	}
 
-	// Wire DI placeholder - in real app this would be used for dependency injection
-	_ = wire.Build
-
-	// Start server with graceful shutdown
+	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Start HTTP server in goroutine
+	// Start server in goroutine
 	go func() {
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = "8080" // Default port
-		}
-		logger.Info("HTTP server starting", zap.String("port", port))
-		if err := router.Run(":" + port); err != nil {
-			logger.Error("Server failed to start", zap.Error(err))
+		app.Logger.Info("HTTP server starting",
+			zap.String("address", server.Addr),
+			zap.String("server_id", serverID),
+		)
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			app.Logger.Error("Server failed to start", zap.Error(err))
 			cancel()
 		}
 	}()
 
-	// Graceful shutdown
+	// Wait for shutdown signal
+	gracefulShutdown(ctx, cancel, server, app.Logger)
+}
+
+// gracefulShutdown handles graceful server shutdown
+func gracefulShutdown(ctx context.Context, cancel context.CancelFunc, server *http.Server, logger *zap.Logger) {
+	// Create channel to listen for interrupt signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
+	// Wait for signal or context cancellation
 	select {
-	case <-sigChan:
-		logger.Info("Shutdown signal received")
+	case sig := <-sigChan:
+		logger.Info("Shutdown signal received", zap.String("signal", sig.String()))
 	case <-ctx.Done():
-		logger.Info("Context cancelled")
+		logger.Info("Application context cancelled")
 	}
 
-	// Graceful shutdown timeout
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Create shutdown context with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
-	logger.Info("app shutting down gracefully")
-	<-shutdownCtx.Done()
+	logger.Info("Initiating graceful shutdown...")
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error("Server shutdown failed", zap.Error(err))
+
+		// Force close if graceful shutdown fails
+		if closeErr := server.Close(); closeErr != nil {
+			logger.Error("Server force close failed", zap.Error(closeErr))
+		}
+	} else {
+		logger.Info("Server shutdown completed successfully")
+	}
+}
+
+// getPort returns the port from environment or default
+func getPort() string {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	return port
+}
+
+// getEnvironment returns the environment from ENV or default
+func getEnvironment() string {
+	env := os.Getenv("ENV")
+	if env == "" {
+		env = "development"
+	}
+	return env
 }

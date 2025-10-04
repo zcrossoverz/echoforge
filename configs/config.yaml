@@ -3,7 +3,7 @@
 
 # Database Configuration (required)
 # Environment variable override: DB_DSN
-DB_DSN: "postgres://postgres:password@localhost:5432/echoforge_dev?sslmode=disable"
+DB_DSN: "postgres://postgres:admin@localhost:5432/bloggo?sslmode=disable"
 
 # JWT Authentication Secret (required, minimum 32 characters)
 # Environment variable override: JWT_SECRET
