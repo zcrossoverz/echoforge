@@ -19,6 +19,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-01
 - PostgreSQL 16+ with GORM ORM, existing user domain/repository from Task 1.2 (004-define-register-and)
 - Go 1.25+ + Viper v1.19.0 (config), Zap v1.27.0 (logging), go-playground/validator/v10 (validation) (006-define-config-and)
 - Configuration files (YAML) and environment variables, no database storage for this feature (006-define-config-and)
+- Go 1.25+ + GORM v1.26+, Gin v1.10+, Zap v1.27+, Viper v1.19+, bcrypt, JWT v5.3+, Testify v1.11+ (006-i-already-create)
+- PostgreSQL 16+ database "bloggo" (host: localhost, user: postgres, password: admin) (006-i-already-create)
 
 ## Project Structure (Modular Monolith)
 ```
@@ -56,9 +58,9 @@ migrations/         # golang-migrate DB schemas
 - Lean MVP: 500-1000 LOC, YAGNI principles
 
 ## Recent Changes
+- 006-i-already-create: Added Go 1.25+ + GORM v1.26+, Gin v1.10+, Zap v1.27+, Viper v1.19+, bcrypt, JWT v5.3+, Testify v1.11+
 - 006-define-config-and: Added Go 1.25+ + Viper v1.19.0 (config), Zap v1.27.0 (logging), go-playground/validator/v10 (validation)
 - 004-define-register-and: Added Go 1.25+ + gin v1.10.0, gorm.io/gorm v1.26.12, go-playground/validator/v10 v10.27.0, golang.org/x/crypto v0.42.0, github.com/golang-jwt/jwt/v5, testify v1.13.1
-- 003-define-user-domain: Added Go 1.25+ + GORM v1.26+ (ORM), Testify (testing), UUID package (unique identifiers), bcrypt (password hashing)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

@@ -114,6 +114,144 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	return domainUser, nil
 }
 
+// FindByID retrieves a user by their UUID
+func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	if id == "" {
+		return nil, fmt.Errorf("id cannot be empty: %w", domain.ErrRepositoryFailure)
+	}
+
+	// Parse UUID
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %w", err)
+	}
+
+	var gormUser GormUser
+	result := r.db.WithContext(ctx).
+		Where("id = ?", userID).
+		First(&gormUser)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, nil // Not found is not an error
+		}
+		return nil, fmt.Errorf("failed to find user: %w", domain.ErrRepositoryFailure)
+	}
+
+	// Convert GORM model to domain entity
+	domainUser := &domain.User{
+		ID:           gormUser.ID,
+		Email:        gormUser.Email,
+		PasswordHash: gormUser.PasswordHash,
+		CreatedAt:    unixToTime(gormUser.CreatedAt),
+		UpdatedAt:    unixToTime(gormUser.UpdatedAt),
+	}
+
+	// Validate the retrieved entity
+	if err := domainUser.Validate(); err != nil {
+		return nil, fmt.Errorf("retrieved user is invalid: %w", err)
+	}
+
+	return domainUser, nil
+}
+
+// Update modifies an existing user entity
+func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	if user == nil {
+		return fmt.Errorf("user cannot be nil: %w", domain.ErrRepositoryFailure)
+	}
+
+	// Validate domain entity
+	if err := user.Validate(); err != nil {
+		return err
+	}
+
+	// Convert domain entity to GORM model
+	gormUser := &GormUser{
+		ID:           user.ID,
+		Email:        user.Email,
+		PasswordHash: user.PasswordHash,
+		CreatedAt:    user.CreatedAt.Unix(),
+		UpdatedAt:    time.Now().Unix(), // Update timestamp
+	}
+
+	// Execute database operation with context
+	result := r.db.WithContext(ctx).Model(&GormUser{}).Where("id = ?", user.ID).Updates(gormUser)
+	if result.Error != nil {
+		// Check for unique constraint violation
+		if isDuplicateKeyError(result.Error) {
+			return domain.ErrUserAlreadyExists
+		}
+		return fmt.Errorf("failed to update user: %w", domain.ErrRepositoryFailure)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found: %w", domain.ErrRepositoryFailure)
+	}
+
+	// Update the domain entity with new timestamp
+	user.UpdatedAt = unixToTime(gormUser.UpdatedAt)
+
+	return nil
+}
+
+// Delete removes a user entity
+func (r *UserRepository) Delete(ctx context.Context, id string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	if id == "" {
+		return fmt.Errorf("id cannot be empty: %w", domain.ErrRepositoryFailure)
+	}
+
+	// Parse UUID
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("invalid user ID format: %w", err)
+	}
+
+	// Execute database operation with context
+	result := r.db.WithContext(ctx).Where("id = ?", userID).Delete(&GormUser{})
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete user: %w", domain.ErrRepositoryFailure)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("user not found: %w", domain.ErrRepositoryFailure)
+	}
+
+	return nil
+}
+
+// ExistsByEmail checks if a user with the given email exists
+func (r *UserRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
+
+	if email == "" {
+		return false, fmt.Errorf("email cannot be empty: %w", domain.ErrRepositoryFailure)
+	}
+
+	var count int64
+	result := r.db.WithContext(ctx).Model(&GormUser{}).Where("email = ?", email).Count(&count)
+
+	if result.Error != nil {
+		return false, fmt.Errorf("failed to check email existence: %w", domain.ErrRepositoryFailure)
+	}
+
+	return count > 0, nil
+}
+
 // Helper functions
 
 // isDuplicateKeyError checks if the error is a unique constraint violation

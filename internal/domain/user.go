@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -89,13 +88,4 @@ func (u *User) Validate() error {
 // IsValid returns true if entity passes all validation rules
 func (u *User) IsValid() bool {
 	return u.Validate() == nil
-}
-
-// UserRepository defines the persistence contract for User entities (clone-and-extend model)
-type UserRepository interface {
-	// Create persists a new user entity
-	Create(ctx context.Context, user *User) error
-
-	// FindByEmail retrieves a user by email (global uniqueness in clone)
-	FindByEmail(ctx context.Context, email string) (*User, error)
 }
