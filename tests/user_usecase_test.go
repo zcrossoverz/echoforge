@@ -7,63 +7,104 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/zcrossoverz/echoforge/internal/domain"
 	"github.com/zcrossoverz/echoforge/internal/usecase"
 )
 
-// MockUserRepo: Giữ nguyên (từ hướng dẫn trước)
-type MockUserRepo struct {
-	mock.Mock
-}
+func TestUserUseCase_CreateUser_Success(t *testing.T) {
+	mockRepo := NewMockUserRepository()
+	userUseCase := usecase.NewUserUseCase(mockRepo)
+	ctx := context.Background()
 
-func (m *MockUserRepo) Create(user *domain.User) error {
-	args := m.Called(user)
-	return args.Error(0)
-}
+	email := "new@example.com"
+	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
 
-func (m *MockUserRepo) FindByEmail(email string) (*domain.User, error) {
-	args := m.Called(email)
-	return args.Get(0).(*domain.User), args.Error(1)
-}
+	createdUser, err := userUseCase.CreateUser(ctx, email, passwordHash)
 
-func (m *MockUserRepo) Update(user *domain.User) error {
-	args := m.Called(user)
-	return args.Error(0)
-}
-
-func (m *MockUserRepo) Delete(id uuid.UUID) error {
-	args := m.Called(id)
-	return args.Error(0)
-}
-
-// Các test khác giữ nguyên: TestUserUsecase_Register_Success, Register_AlreadyExists, Login_WrongPassword, Login_NotFound
-
-func TestUserUsecase_Login_Success(t *testing.T) {
-	mockRepo := new(MockUserRepo)
-	uc := usecase.NewUserUsecase(mockRepo)
-
-	// Setup: Gen real hash từ domain (unpack explicit để fix compile)
-	setupUser, err := domain.NewUser("login@example.com", "password")
-	if err != nil {
-		t.Fatal(err) // Halt nếu setup fail (TDD safety)
-	}
-	hashedPw := setupUser.PasswordHash // Now safe access
-
-	// Mock user với real hash
-	user := &domain.User{
-		ID:           uuid.New(),
-		Email:        "login@example.com",
-		PasswordHash: hashedPw, // Real hash cho CheckPassword verify
-		Role:         "user",
-		CreatedAt:    time.Now(),
-	}
-	mockRepo.On("FindByEmail", "login@example.com").Return(user, nil)
-
-	// Call usecase
-	token, err := uc.Login(context.Background(), "login@example.com", "password")
 	assert.NoError(t, err)
-	assert.NotEmpty(t, token) // Stub token check
+	require.NotNil(t, createdUser)
+	assert.Equal(t, email, createdUser.Email)
+	assert.Equal(t, passwordHash, createdUser.PasswordHash)
+	assert.NotEqual(t, uuid.Nil, createdUser.ID)
+	assert.WithinDuration(t, time.Now(), createdUser.CreatedAt, 2*time.Second)
+	assert.Equal(t, 1, mockRepo.CallCount("Create"))
+}
 
-	mockRepo.AssertExpectations(t)
+func TestUserUseCase_CreateUser_InvalidEmail(t *testing.T) {
+	mockRepo := NewMockUserRepository()
+	userUseCase := usecase.NewUserUseCase(mockRepo)
+	ctx := context.Background()
+
+	invalidEmail := "invalid-email"
+	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
+
+	user, err := userUseCase.CreateUser(ctx, invalidEmail, passwordHash)
+
+	assert.Error(t, err)
+	assert.Nil(t, user)
+	assert.Contains(t, err.Error(), "invalid email format")
+	assert.Equal(t, 0, mockRepo.CallCount("Create")) // Should not reach repository
+}
+
+func TestUserUseCase_CreateUser_WeakPasswordHash(t *testing.T) {
+	mockRepo := NewMockUserRepository()
+	userUseCase := usecase.NewUserUseCase(mockRepo)
+	ctx := context.Background()
+
+	email := "valid@example.com"
+	weakPasswordHash := "short_hash"
+
+	user, err := userUseCase.CreateUser(ctx, email, weakPasswordHash)
+
+	assert.Error(t, err)
+	assert.Nil(t, user)
+	assert.Contains(t, err.Error(), "password hash too short")
+	assert.Equal(t, 0, mockRepo.CallCount("Create")) // Should not reach repository
+}
+
+func TestUserUseCase_CreateUser_DuplicateEmail(t *testing.T) {
+	mockRepo := NewMockUserRepository()
+	userUseCase := usecase.NewUserUseCase(mockRepo)
+	ctx := context.Background()
+
+	email := "duplicate@example.com"
+	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
+
+	// Create first user
+	user1, err := userUseCase.CreateUser(ctx, email, passwordHash)
+	require.NoError(t, err)
+	require.NotNil(t, user1)
+
+	// Try to create second user with same email
+	user2, err := userUseCase.CreateUser(ctx, email, passwordHash)
+
+	assert.ErrorIs(t, err, domain.ErrUserAlreadyExists)
+	assert.Nil(t, user2)
+	assert.Equal(t, 1, mockRepo.CallCount("Create"))      // Only first creation reaches repository
+	assert.Equal(t, 2, mockRepo.CallCount("FindByEmail")) // Both check for existing user
+}
+
+func TestUserUseCase_GetUserByEmail_Success(t *testing.T) {
+	mockRepo := NewMockUserRepository()
+	userUseCase := usecase.NewUserUseCase(mockRepo)
+	ctx := context.Background()
+
+	email := "existing@example.com"
+	passwordHash := "encrypted_password_hash_that_is_at_least_sixty_characters_long"
+
+	// Create user first
+	createdUser, err := userUseCase.CreateUser(ctx, email, passwordHash)
+	require.NoError(t, err)
+
+	// Retrieve user by email
+	foundUser, err := userUseCase.GetUserByEmail(ctx, email)
+
+	assert.NoError(t, err)
+	require.NotNil(t, foundUser)
+	assert.Equal(t, createdUser.ID, foundUser.ID)
+	assert.Equal(t, createdUser.Email, foundUser.Email)
+	assert.Equal(t, createdUser.PasswordHash, foundUser.PasswordHash)
+	assert.Equal(t, 2, mockRepo.CallCount("FindByEmail")) // CreateUser checks availability + GetUserByEmail retrieves
 }

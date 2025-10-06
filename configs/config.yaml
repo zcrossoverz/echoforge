@@ -1,15 +1,79 @@
-# configs/config.yaml
+# Echoforge Configuration Template
+# Configuration for clone-and-extend multi-site deployment model
+
+# Database Configuration (required)
+# Environment variable override: DB_DSN
+DB_DSN: "postgres://postgres:admin@localhost:5432/bloggo?sslmode=disable"
+
+# JWT Authentication Secret (required, minimum 32 characters)
+# Environment variable override: JWT_SECRET
+JWT_SECRET: "your-super-secret-jwt-key-at-least-32-chars-long-for-production"
+
+# Logging Configuration (optional, defaults to "info")
+# Valid values: debug, info, error
+# Environment variable override: LOG_LEVEL
+LOG_LEVEL: "info"
+
+# Development Features (optional, defaults to false)
+# Enable hot-reload for configuration file changes
+# Environment variable override: ENABLE_HOT_RELOAD
+ENABLE_HOT_RELOAD: true
+
+# Legacy Configuration (backward compatibility)
+# These values are maintained for existing deployments
 server:
   port: 8080
-  mode: debug  # Gin mode: release cho prod
+  mode: development  # development, production (maps to Gin modes)
+  host: localhost
+  timeout_seconds: 30
 
-database:
-  url: "postgres://postgres:password@localhost:5432/echoforge?sslmode=disable"  # Env override: DATABASE_URL
-
-jwt:
-  secret: "super-secret-key-change-in-prod"  # Min 32 chars, rotate quarterly
-  expires_in: 24  # Hours
-
+# Application Configuration  
 app:
-  site_id: "default"  # Override per-site: blog1, story1
-  log_level: "info"   # Zerolog level
+  name: "Echoforge Site"            # Display name for this site
+  version: "0.1.0"                  # Semantic versioning for this site
+  environment: development          # development, staging, production
+  rate_limit_enabled: true
+  rate_limit_requests_per_minute: 100
+  request_timeout_seconds: 30
+  max_request_size_mb: 10
+
+# Logging Configuration
+logging:
+  level: info                       # debug, info, warn, error
+  format: json                      # json, console
+  output: stdout                    # stdout, stderr, file
+
+# Multi-Site Configuration Examples
+# Viper usage: app_site_id := viper.GetString("app.site_id")
+#             db.Where("site_id = ?", app_site_id).Find(&users)
+
+# sites:
+#   blog:
+#     site_id: "blog-site"
+#     name: "My Blog"
+#     database:
+#       name: "echoforge_blog"
+#   manga:
+#     site_id: "manga-site"  
+#     name: "Manga Reader"
+#     database:
+#       name: "echoforge_manga"
+
+# Performance Configuration
+performance:
+  enable_caching: false
+  cache_ttl_minutes: 60
+  max_concurrent_requests: 1000
+  worker_pool_size: 10
+
+# Development Configuration
+development:
+  hot_reload: true
+  debug_sql: false
+  profile_enabled: false
+
+# Feature Flags
+features:
+  user_registration: true
+  admin_panel: true
+  api_documentation: true
