@@ -1,0 +1,619 @@
+{
+	"info": {
+		"_postman_id": "echoforge-api-collection",
+		"name": "Echoforge API Collection",
+		"description": "Complete API collection for Echoforge multi-tenant platform. Includes authentication, blog management, portfolio management, file operations, and admin endpoints.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": {
+			"major": 1,
+			"minor": 0,
+			"patch": 0
+		}
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"description": "Base URL for the Echoforge API"
+		},
+		{
+			"key": "siteId",
+			"value": "your-site-id",
+			"description": "Site ID for multi-tenant requests"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"description": "JWT Bearer token (auto-populated after login)"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "register"]
+						},
+						"description": "Register a new user account"
+					}
+				},
+				{
+					"name": "Login User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"securePassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "login"]
+						},
+						"description": "Login user and receive JWT token"
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Auto-extract token from response",
+									"if (pm.response.code === 200) {",
+									"    const responseJson = pm.response.json();",
+									"    if (responseJson.token) {",
+									"        pm.collectionVariables.set('token', responseJson.token);",
+									"        console.log('Token saved to collection variables');",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					]
+				},
+				{
+					"name": "Logout User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "auth", "logout"]
+						},
+						"description": "Logout user and invalidate token"
+					}
+				}
+			]
+		},
+		{
+			"name": "Blog Management",
+			"item": [
+				{
+					"name": "Create Blog Post",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"My First Blog Post\",\n  \"content\": \"This is the content of my blog post with **markdown** support.\",\n  \"excerpt\": \"A brief summary of the post\",\n  \"status\": \"published\",\n  \"tags\": [\"tech\", \"programming\"],\n  \"categories\": [\"Technology\"],\n  \"featured_image\": \"https://example.com/image.jpg\",\n  \"metadata\": {\n    \"reading_time\": 5,\n    \"author_bio\": \"Tech enthusiast\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts"]
+						},
+						"description": "Create a new blog post"
+					}
+				},
+				{
+					"name": "Get All Blog Posts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts?page=1&limit=10&status=published",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "published"
+								}
+							]
+						},
+						"description": "Get paginated list of blog posts"
+					}
+				},
+				{
+					"name": "Get Blog Post by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Get a specific blog post by ID"
+					}
+				},
+				{
+					"name": "Update Blog Post",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Blog Post Title\",\n  \"content\": \"Updated content with new information.\",\n  \"status\": \"published\",\n  \"tags\": [\"tech\", \"programming\", \"updated\"]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Update an existing blog post"
+					}
+				},
+				{
+					"name": "Delete Blog Post",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Delete a blog post"
+					}
+				},
+				{
+					"name": "Search Blog Posts",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/posts/search?q=programming&tags=tech&page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "posts", "search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "programming"
+								},
+								{
+									"key": "tags",
+									"value": "tech"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Search blog posts by content, tags, or categories"
+					}
+				}
+			]
+		},
+		{
+			"name": "Portfolio Management",
+			"item": [
+				{
+					"name": "Create Portfolio Project",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"E-commerce Platform\",\n  \"content\": \"A full-stack e-commerce solution built with modern technologies.\",\n  \"excerpt\": \"Modern e-commerce platform\",\n  \"status\": \"published\",\n  \"tags\": [\"react\", \"nodejs\", \"mongodb\"],\n  \"categories\": [\"Web Development\"],\n  \"featured_image\": \"https://example.com/portfolio-image.jpg\",\n  \"metadata\": {\n    \"demo_url\": \"https://demo.example.com\",\n    \"github_url\": \"https://github.com/user/project\",\n    \"technologies\": [\"React\", \"Node.js\", \"MongoDB\"],\n    \"duration\": \"3 months\",\n    \"team_size\": 2\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portfolio",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portfolio"]
+						},
+						"description": "Create a new portfolio project"
+					}
+				},
+				{
+					"name": "Get All Portfolio Projects",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portfolio?page=1&limit=10&featured=true",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portfolio"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "featured",
+									"value": "true"
+								}
+							]
+						},
+						"description": "Get paginated list of portfolio projects"
+					}
+				},
+				{
+					"name": "Get Portfolio Project by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portfolio/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portfolio", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Get a specific portfolio project by ID"
+					}
+				},
+				{
+					"name": "Update Portfolio Project",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated E-commerce Platform\",\n  \"content\": \"Enhanced e-commerce solution with new features.\",\n  \"metadata\": {\n    \"demo_url\": \"https://new-demo.example.com\",\n    \"technologies\": [\"React\", \"Node.js\", \"MongoDB\", \"Redis\"]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portfolio/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portfolio", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Update an existing portfolio project"
+					}
+				},
+				{
+					"name": "Delete Portfolio Project",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/portfolio/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "portfolio", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Delete a portfolio project"
+					}
+				}
+			]
+		},
+		{
+			"name": "File Management",
+			"item": [
+				{
+					"name": "Upload File",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								},
+								{
+									"key": "purpose",
+									"value": "blog_image",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/files/upload",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "files", "upload"]
+						},
+						"description": "Upload a file (image, document, etc.)"
+					}
+				},
+				{
+					"name": "Get File by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/files/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "files", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Get file metadata by ID"
+					}
+				},
+				{
+					"name": "Delete File",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/files/123e4567-e89b-12d3-a456-426614174000",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "files", "123e4567-e89b-12d3-a456-426614174000"]
+						},
+						"description": "Delete a file"
+					}
+				}
+			]
+		},
+		{
+			"name": "Categories & Tags",
+			"item": [
+				{
+					"name": "Get All Categories",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "categories"]
+						},
+						"description": "Get all categories"
+					}
+				},
+				{
+					"name": "Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Technology\",\n  \"description\": \"Posts about technology and programming\",\n  \"slug\": \"technology\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "categories"]
+						},
+						"description": "Create a new category"
+					}
+				},
+				{
+					"name": "Get All Tags",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tags",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tags"]
+						},
+						"description": "Get all tags"
+					}
+				},
+				{
+					"name": "Create Tag",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Site-ID",
+								"value": "{{siteId}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"programming\",\n  \"description\": \"Programming-related content\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tags",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tags"]
+						},
+						"description": "Create a new tag"
+					}
+				}
+			]
+		},
+		{
+			"name": "System & Health",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check API health status"
+					}
+				},
+				{
+					"name": "Get API Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/info",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "info"]
+						},
+						"description": "Get API version and information"
+					}
+				}
+			]
+		}
+	]
+}
