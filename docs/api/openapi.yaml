@@ -2,46 +2,80 @@ openapi: 3.0.3
 info:
   title: Echoforge API
   description: |
-    A modular monolith backend service for multi-site content platforms.
+    **Echoforge Multi-Tenant Platform API**
     
-    Built with Go 1.25+ and hexagonal architecture principles, Echoforge provides
-    a lean, scalable foundation for user management and authentication.
+    Echoforge is a flexible, multi-tenant platform that supports various site types including blogs, manga platforms, and portfolios. This API provides comprehensive endpoints for managing content, users, and site-specific features while maintaining strict tenant isolation.
     
-    ## Features
-    - JWT-based authentication
-    - User management with secure password hashing
-    - Rate limiting and security headers
-    - Performance optimized (<500ms response times)
+    ## Key Features
+    - **Multi-Tenant Architecture**: Each site operates independently with `site_id` isolation
+    - **Flexible Content Types**: Blog posts, manga series, portfolio projects
+    - **Authentication & Authorization**: JWT-based auth with role-based access control
+    - **File Management**: Upload and manage images, videos, and documents
+    - **Search & Analytics**: Full-text search and detailed analytics
+    - **Configuration Management**: Site-specific settings and customization
     
     ## Authentication
-    Most endpoints require a JWT token in the Authorization header:
+    Most endpoints require authentication via JWT token in the Authorization header:
     ```
     Authorization: Bearer <jwt_token>
     ```
-  version: 1.0.0
+    
+    ## Site Identification
+    The API uses the `site_id` to isolate tenant data, which can be provided via:
+    - `X-Site-ID` header (recommended)
+    - Subdomain extraction (e.g., `blog.example.com` → `blog-001`)
+    - Query parameter `site_id` (fallback)
+    
+    ## Rate Limiting
+    API requests are rate-limited per site:
+    - **Standard**: 100 requests/minute
+    - **Authenticated**: 1000 requests/minute
+    - **File uploads**: 10 requests/minute
+    
+    ## Pagination
+    List endpoints support pagination with query parameters:
+    - `page`: Page number (default: 1)
+    - `limit`: Items per page (default: 10, max: 100)
+    
+    ## Error Handling
+    The API uses standard HTTP status codes and returns errors in a consistent format:
+    ```json
+    {
+      "error": "error_code",
+      "message": "Human-readable error message",
+      "details": {
+        "field": "validation error details"
+      }
+    }
+    ```
+  version: '1.0.0'
   contact:
     name: Echoforge API Support
-    url: https://github.com/zcrossoverz/echoforge
+    url: https://github.com/echoforge/echoforge
+    email: support@echoforge.dev
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: http://localhost:8080
-    description: Development server
-  - url: https://api.example.com
+  - url: https://api.echoforge.com/v1
     description: Production server
+  - url: https://staging-api.echoforge.com/v1
+    description: Staging server
+  - url: http://localhost:8080/api/v1
+    description: Development server
 
 security:
-  - bearerAuth: []
+  - BearerAuth: []
+  - SiteID: []
 
 paths:
+  # Health Check
   /health:
     get:
-      summary: Health check
-      description: Check if the API is running and healthy
-      tags:
-        - Health
+      tags: [Health]
+      summary: Health check endpoint
+      description: Returns the health status of the API
       security: []
       responses:
         '200':
@@ -53,104 +87,334 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: ok
-                required:
-                  - status
+                    enum: [healthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      cache:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      storage:
+                        type: string
+                        enum: [healthy, unhealthy]
 
-  /api/v1/status:
-    get:
-      summary: Detailed status information
-      description: Get detailed system status including database and memory usage
-      tags:
-        - Health
-      security: []
-      responses:
-        '200':
-          description: Detailed status information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/StatusResponse'
-
-  /api/v1/register:
+  # Authentication Endpoints
+  /auth/register:
     post:
-      summary: User registration
-      description: Register a new user account
-      tags:
-        - Authentication
+      tags: [Authentication]
+      summary: Register a new user
+      description: Create a new user account for a specific site
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              type: object
+              required: [email, password, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "SecurePassword123!"
+                name:
+                  type: string
+                  example: "John Doe"
+                role:
+                  type: string
+                  enum: [admin, editor, author, user]
+                  default: user
       responses:
         '201':
           description: User registered successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Registration successful"
+                  user:
+                    $ref: '#/components/schemas/User'
         '400':
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidationError'
+          $ref: '#/components/responses/BadRequest'
         '409':
           description: User already exists
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '429':
-          description: Rate limit exceeded
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RateLimitError'
 
-  /api/v1/login:
+  /auth/login:
     post:
+      tags: [Authentication]
       summary: User login
-      description: Authenticate an existing user
-      tags:
-        - Authentication
+      description: Authenticate user and return JWT token
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                remember_me:
+                  type: boolean
+                  default: false
       responses:
         '200':
           description: Login successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '400':
-          description: Invalid request data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  expires_at:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/User'
         '401':
-          description: Invalid credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          description: Rate limit exceeded
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User logout
+      description: Invalidate the current JWT token
+      responses:
+        '200':
+          description: Logout successful
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RateLimitError'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logout successful"
 
-  /api/v1/logout:
+  # Blog Endpoints
+  /blog/posts:
+    get:
+      tags: [Blog]
+      summary: List blog posts
+      description: Retrieve a paginated list of blog posts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, archived]
+            default: published
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BlogPost'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags: [Blog]
+      summary: Create a blog post
+      description: Create a new blog post
+      security:
+        - BearerAuth: [author, editor, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogPostCreate'
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPost'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /blog/posts/{slug}:
+    get:
+      tags: [Blog]
+      summary: Get blog post by slug
+      description: Retrieve a specific blog post by its slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "getting-started-with-go"
+      responses:
+        '200':
+          description: Post retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPostDetailed'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # Portfolio Endpoints  
+  /portfolio/projects:
+    get:
+      tags: [Portfolio]
+      summary: List portfolio projects
+      description: Retrieve a paginated list of portfolio projects
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Projects retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortfolioProject'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  # File Management
+  /files/upload:
+    post:
+      tags: [Files]
+      summary: Upload file
+      description: Upload a file to the server
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                category:
+                  type: string
+                  enum: [image, video, document, audio]
+                alt_text:
+                  type: string
+                caption:
+                  type: string
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUpload'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # Search
+  /search:
+    get:
+      tags: [Search]
+      summary: Search content
+      description: Search across all content types
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, blog, manga, portfolio]
+            default: all
+      responses:
+        '200':
+          description: Search results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchResult'
     post:
       summary: User logout
       description: Logout the current user and invalidate JWT token
@@ -311,275 +575,252 @@ paths:
 
 components:
   securitySchemes:
-    bearerAuth:
+    BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT token obtained from login or registration
+    SiteID:
+      type: apiKey
+      in: header
+      name: X-Site-ID
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 
   schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "validation_error"
+        message:
+          type: string
+          example: "The request contains invalid data"
+        details:
+          type: object
+          additionalProperties: true
+      required: [error, message]
+
     User:
       type: object
       properties:
         id:
           type: string
           format: uuid
-          example: 550e8400-e29b-41d4-a716-446655440000
-          description: Unique user identifier
         email:
           type: string
           format: email
-          example: user@example.com
-          description: User's email address
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, editor, author, user]
+        is_active:
+          type: boolean
         created_at:
           type: string
           format: date-time
-          example: "2024-01-01T12:00:00Z"
-          description: Account creation timestamp
         updated_at:
           type: string
           format: date-time
-          example: "2024-01-01T12:00:00Z"
-          description: Last profile update timestamp
-      required:
-        - id
-        - email
-        - created_at
-        - updated_at
 
-    RegisterRequest:
+    BlogPost:
       type: object
       properties:
-        email:
+        id:
           type: string
-          format: email
-          maxLength: 255
-          example: newuser@example.com
-          description: User's email address (must be unique)
-        password:
+          format: uuid
+        title:
           type: string
-          minLength: 8
-          example: SecurePassword123!
-          description: User's password (min 8 characters, complexity recommended)
-      required:
-        - email
-        - password
-
-    LoginRequest:
-      type: object
-      properties:
-        email:
+        slug:
           type: string
-          format: email
-          example: user@example.com
-          description: User's email address
-        password:
+        excerpt:
           type: string
-          example: SecurePassword123!
-          description: User's password
-      required:
-        - email
-        - password
-
-    UpdateProfileRequest:
-      type: object
-      properties:
-        email:
+        content:
           type: string
-          format: email
-          maxLength: 255
-          example: newemail@example.com
-          description: New email address (must be unique)
-
-    ChangePasswordRequest:
-      type: object
-      properties:
-        current_password:
-          type: string
-          example: OldPassword123!
-          description: Current password for verification
-        new_password:
-          type: string
-          minLength: 8
-          example: NewSecurePassword456!
-          description: New password (min 8 characters)
-      required:
-        - current_password
-        - new_password
-
-    AuthResponse:
-      type: object
-      properties:
-        user:
-          $ref: '#/components/schemas/User'
-        token:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-          description: JWT authentication token
-        expires_at:
-          type: string
-          format: date-time
-          example: "2024-01-02T12:00:00Z"
-          description: Token expiration timestamp
-      required:
-        - user
-        - token
-        - expires_at
-
-    StatusResponse:
-      type: object
-      properties:
         status:
           type: string
-          example: ok
-          description: Overall system status
-        version:
+          enum: [draft, published, archived]
+        featured_image:
           type: string
-          example: "1.0.0"
-          description: API version
-        uptime:
+          format: uri
+        author:
+          $ref: '#/components/schemas/User'
+        published_at:
           type: string
-          example: "2h30m15s"
-          description: System uptime
-        database:
-          type: object
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    BlogPostDetailed:
+      allOf:
+        - $ref: '#/components/schemas/BlogPost'
+        - type: object
           properties:
-            status:
-              type: string
-              example: connected
-            connections:
-              type: object
-              properties:
-                active:
-                  type: integer
-                  example: 5
-                idle:
-                  type: integer
-                  example: 10
-                max:
-                  type: integer
-                  example: 100
-        memory:
-          type: object
-          properties:
-            allocated:
-              type: string
-              example: "45MB"
-            system:
-              type: string
-              example: "67MB"
+            view_count:
+              type: integer
+            reading_time:
+              type: integer
+              description: Estimated reading time in minutes
 
-    EmailAvailabilityResponse:
+    BlogPostCreate:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [draft, published]
+          default: draft
+        featured_image:
+          type: string
+          format: uri
+
+    PortfolioProject:
       type: object
       properties:
-        email:
+        id:
           type: string
-          format: email
-          example: test@example.com
-          description: Email address that was checked
-        available:
-          type: boolean
-          example: true
-          description: Whether the email is available for registration
-      required:
-        - email
-        - available
-
-    Error:
-      type: object
-      properties:
-        error:
+          format: uuid
+        title:
           type: string
-          example: Invalid email or password
-          description: Error message
-        code:
+        slug:
           type: string
-          example: INVALID_CREDENTIALS
-          description: Error code for programmatic handling
-      required:
-        - error
-
-    ValidationError:
-      type: object
-      properties:
-        error:
+        description:
           type: string
-          example: Validation failed
-          description: General validation error message
-        details:
-          type: object
-          additionalProperties:
+        category:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived, private]
+        featured_image:
+          type: string
+          format: uri
+        technologies:
+          type: array
+          items:
             type: string
-          example:
-            email: Invalid email format
-            password: Password must be at least 8 characters
-          description: Field-specific validation errors
-      required:
-        - error
+        project_url:
+          type: string
+          format: uri
+        github_url:
+          type: string
+          format: uri
+        is_featured:
+          type: boolean
+        view_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
 
-    RateLimitError:
+    FileUpload:
       type: object
       properties:
-        error:
+        id:
           type: string
-          example: Rate limit exceeded
-          description: Rate limit error message
-        retry_after:
+          format: uuid
+        file_name:
+          type: string
+        original_name:
+          type: string
+        file_size:
           type: integer
-          example: 60
-          description: Seconds to wait before retrying
-      required:
-        - error
-        - retry_after
+        mime_type:
+          type: string
+        category:
+          type: string
+          enum: [image, video, document, audio]
+        url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        uploaded_at:
+          type: string
+          format: date-time
 
-  responses:
-    UnauthorizedError:
-      description: Authentication required
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error: Authentication required
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [blog_post, manga_series, portfolio_project]
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type: string
+        url:
+          type: string
+          format: uri
+        relevance_score:
+          type: number
+          format: float
 
-    ForbiddenError:
-      description: Insufficient permissions
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error: Insufficient permissions
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        per_page:
+          type: integer
+        total_items:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
 
-    NotFoundError:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-          example:
-            error: Resource not found
-
-    ValidationError:
-      description: Input validation failed
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ValidationError'
-
-    RateLimitError:
-      description: Rate limit exceeded
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/RateLimitError'
-
-tags:
-  - name: Health
-    description: Health check and system status endpoints
-  - name: Authentication
-    description: User authentication and session management
-  - name: User Management
-    description: User profile and account management
-  - name: Utilities
-    description: Utility endpoints for validation and checks

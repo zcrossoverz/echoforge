@@ -1,626 +1,272 @@
 # Echoforge API Documentation
 
-**Version**: 1.0.0  
-**Base URL**: `http://localhost:8080`  
-**API Version**: `v1`
+This directory contains comprehensive API documentation for the Echoforge multi-tenant platform.
 
-## Overview
+## 📁 Contents
 
-Echoforge provides a RESTful API for user management and authentication. All API endpoints are versioned and follow REST conventions.
+- `openapi.yaml` - Complete OpenAPI 3.0 specification (22KB+)
+- `postman-collection.json` - Postman collection with all endpoints
+- Interactive examples and test scenarios
 
-### API Versioning
+## 🚀 Quick Start
 
-All API endpoints are prefixed with `/api/v1/` to ensure backward compatibility.
+### Option 1: Postman Collection (Recommended)
 
-### Content Types
+1. **Import Collection**: Import `postman-collection.json` into Postman
+2. **Set Variables**: Configure collection variables:
+   - `baseUrl`: `http://localhost:8080` (or your server URL)
+   - `siteId`: Your site identifier (e.g., `my-blog`, `manga-site`)
+3. **Test Authentication**: Run "Login User" to auto-populate JWT token
+4. **Explore Endpoints**: All requests are pre-configured with proper headers
 
-- **Request**: `application/json`
-- **Response**: `application/json`
+### Option 2: OpenAPI Specification
 
-### Authentication
+1. **View Online**: Paste `openapi.yaml` into [Swagger Editor](https://editor.swagger.io/)
+2. **Generate Client**: Use OpenAPI generators for your language
+3. **Interactive Docs**: Deploy with Swagger UI for team documentation
 
-The API uses JWT (JSON Web Tokens) for authentication. Include the token in the `Authorization` header:
+## 🔧 Configuration
 
-```
-Authorization: Bearer <jwt_token>
-```
-
-### Error Handling
-
-All errors follow a consistent format:
-
-```json
-{
-  "error": "Error message",
-  "code": "ERROR_CODE",
-  "details": {
-    "field": "validation error details"
-  }
-}
-```
-
-### HTTP Status Codes
-
-| Code | Meaning |
-|------|---------|
-| `200` | OK - Request successful |
-| `201` | Created - Resource created successfully |
-| `400` | Bad Request - Invalid request data |
-| `401` | Unauthorized - Authentication required |
-| `403` | Forbidden - Insufficient permissions |
-| `404` | Not Found - Resource not found |
-| `409` | Conflict - Resource already exists |
-| `422` | Unprocessable Entity - Validation failed |
-| `429` | Too Many Requests - Rate limit exceeded |
-| `500` | Internal Server Error - Server error |
-
-## Health & Status Endpoints
-
-### Health Check
-
-Check if the API is running and healthy.
-
-**Endpoint**: `GET /health`
-
-**Response**:
-```json
-{
-  "status": "ok"
-}
-```
-
-**Example**:
+### Environment Variables
 ```bash
-curl -X GET http://localhost:8080/health
+# Set in your environment or Postman
+BASE_URL=http://localhost:8080
+SITE_ID=your-site-id
+JWT_TOKEN=your-jwt-token-here
 ```
 
-### Detailed Status
+### Required Headers
+All API requests require:
+```http
+X-Site-ID: your-site-id
+Authorization: Bearer <jwt-token>  # For protected endpoints
+Content-Type: application/json     # For POST/PUT requests
+```
 
-Get detailed system status information.
+## 📊 API Overview
 
-**Endpoint**: `GET /api/v1/status`
+| Endpoint Group | Endpoints | Description |
+|---------------|-----------|-------------|
+| **Authentication** | 3 | Register, login, logout |
+| **Blog Management** | 6 | CRUD + search for blog posts |
+| **Portfolio** | 5 | CRUD for portfolio projects |
+| **File Management** | 3 | Upload, retrieve, delete files |
+| **Categories & Tags** | 4 | Manage content organization |
+| **System** | 2 | Health checks and API info |
 
-**Headers**: None required
+## 🏗️ Multi-Tenant Architecture
 
-**Response**:
-```json
-{
-  "status": "ok",
-  "version": "1.0.0",
-  "uptime": "2h30m15s",
-  "database": {
-    "status": "connected",
-    "connections": {
-      "active": 5,
-      "idle": 10,
-      "max": 100
+Echoforge supports multiple sites with isolated data:
+
+### Site Types
+- **Blog Site**: Content management with posts, categories, tags
+- **Portfolio Site**: Project showcases with rich metadata
+- **Manga Site**: Chapter-based content with series management
+- **Custom Sites**: Extensible for any use case
+
+### Site Isolation
+- Each request must include `X-Site-ID` header
+- Data is automatically filtered by site
+- No cross-site data leakage
+
+## 🔐 Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as Auth API
+    participant D as Database
+    
+    C->>A: POST /auth/register
+    A->>D: Create user
+    D-->>A: User created
+    A-->>C: 201 Created
+    
+    C->>A: POST /auth/login
+    A->>D: Validate credentials
+    D-->>A: User valid
+    A-->>C: JWT token
+    
+    Note over C: Store token for future requests
+    
+    C->>A: API requests with Bearer token
+    A->>A: Validate JWT
+    A-->>C: Protected resource
+```
+
+## 📝 Example Workflows
+
+### Creating a Blog Post
+```bash
+# 1. Login and get token
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -H "X-Site-ID: my-blog" \
+  -d '{"email": "admin@blog.com", "password": "secure123"}'
+
+# 2. Create blog post with token
+curl -X POST http://localhost:8080/api/v1/posts \
+  -H "Content-Type: application/json" \
+  -H "X-Site-ID: my-blog" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "title": "My First Post",
+    "content": "Hello world!",
+    "status": "published",
+    "tags": ["intro", "blog"]
+  }'
+```
+
+### Portfolio Project Management
+```bash
+# Create portfolio project
+curl -X POST http://localhost:8080/api/v1/portfolio \
+  -H "Content-Type: application/json" \
+  -H "X-Site-ID: my-portfolio" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "title": "E-commerce Platform",
+    "content": "Full-stack solution...",
+    "metadata": {
+      "demo_url": "https://demo.example.com",
+      "github_url": "https://github.com/user/project",
+      "technologies": ["React", "Node.js", "MongoDB"]
     }
-  },
-  "memory": {
-    "allocated": "45MB",
-    "system": "67MB"
+  }'
+```
+
+## 🧪 Testing with Postman
+
+### Collection Features
+- **Auto-authentication**: Login automatically saves JWT token
+- **Environment variables**: Easy switching between dev/prod
+- **Request examples**: Pre-filled with realistic data
+- **Test scripts**: Automated validation of responses
+
+### Test Scenarios
+1. **User Registration Flow**
+2. **Content Creation & Management**
+3. **File Upload & Retrieval**
+4. **Search & Filtering**
+5. **Error Handling**
+
+## 🔍 Error Handling
+
+### Standard Error Response
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid input data",
+    "details": {
+      "field": "email",
+      "issue": "must be valid email format"
+    }
   }
 }
 ```
 
-## Authentication Endpoints
+### Common HTTP Status Codes
+- `200` - Success
+- `201` - Created
+- `400` - Bad Request (validation errors)
+- `401` - Unauthorized (invalid/missing token)
+- `403` - Forbidden (insufficient permissions)
+- `404` - Not Found
+- `429` - Rate Limited
+- `500` - Internal Server Error
 
-### User Registration
+## 🚀 Integration Examples
 
-Register a new user account.
+### JavaScript/Node.js
+```javascript
+const API_BASE = 'http://localhost:8080/api/v1';
+const SITE_ID = 'my-blog';
 
-**Endpoint**: `POST /api/v1/register`
+// Login and store token
+async function login(email, password) {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Site-ID': SITE_ID,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  
+  const data = await response.json();
+  localStorage.setItem('jwt_token', data.token);
+  return data.token;
+}
 
-**Headers**:
-- `Content-Type: application/json`
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123!"
+// Create blog post
+async function createPost(title, content) {
+  const token = localStorage.getItem('jwt_token');
+  const response = await fetch(`${API_BASE}/posts`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Site-ID': SITE_ID,
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ title, content, status: 'published' }),
+  });
+  
+  return response.json();
 }
 ```
 
-**Validation Rules**:
-- `email`: Valid email format, max 255 characters, unique
-- `password`: Minimum 8 characters, at least one uppercase, one lowercase, one number
+### Python
+```python
+import requests
 
-**Success Response** (`201 Created`):
-```json
-{
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expires_at": "2024-01-02T12:00:00Z"
-}
+API_BASE = 'http://localhost:8080/api/v1'
+SITE_ID = 'my-blog'
+
+class EchoforgeAPI:
+    def __init__(self, site_id):
+        self.site_id = site_id
+        self.token = None
+        self.headers = {
+            'Content-Type': 'application/json',
+            'X-Site-ID': site_id,
+        }
+    
+    def login(self, email, password):
+        response = requests.post(f'{API_BASE}/auth/login', 
+            headers=self.headers,
+            json={'email': email, 'password': password}
+        )
+        
+        data = response.json()
+        self.token = data['token']
+        self.headers['Authorization'] = f'Bearer {self.token}'
+        return data
+    
+    def create_post(self, title, content, **kwargs):
+        return requests.post(f'{API_BASE}/posts',
+            headers=self.headers,
+            json={'title': title, 'content': content, **kwargs}
+        ).json()
+
+# Usage
+api = EchoforgeAPI('my-blog')
+api.login('admin@blog.com', 'secure123')
+post = api.create_post('My Post', 'Hello world!', status='published')
 ```
 
-**Error Responses**:
-
-`400 Bad Request` - Invalid input:
-```json
-{
-  "error": "Validation failed",
-  "details": {
-    "email": "Invalid email format",
-    "password": "Password must be at least 8 characters"
-  }
-}
-```
-
-`409 Conflict` - User already exists:
-```json
-{
-  "error": "User already exists with this email"
-}
-```
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/api/v1/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newuser@example.com",
-    "password": "SecurePassword123!"
-  }'
-```
-
-### User Login
-
-Authenticate an existing user.
-
-**Endpoint**: `POST /api/v1/login`
-
-**Headers**:
-- `Content-Type: application/json`
-
-**Request Body**:
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePassword123!"
-}
-```
-
-**Success Response** (`200 OK`):
-```json
-{
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  },
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expires_at": "2024-01-02T12:00:00Z"
-}
-```
-
-**Error Responses**:
-
-`400 Bad Request` - Invalid input:
-```json
-{
-  "error": "Email and password are required"
-}
-```
-
-`401 Unauthorized` - Invalid credentials:
-```json
-{
-  "error": "Invalid email or password"
-}
-```
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/api/v1/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePassword123!"
-  }'
-```
-
-### User Logout
-
-Logout the current user (invalidate JWT token).
-
-**Endpoint**: `POST /api/v1/logout`
-
-**Headers**:
-- `Authorization: Bearer <jwt_token>`
-
-**Request Body**: None
-
-**Success Response** (`200 OK`):
-```json
-{
-  "message": "Successfully logged out"
-}
-```
-
-**Error Responses**:
-
-`401 Unauthorized` - Invalid or missing token:
-```json
-{
-  "error": "Invalid or expired token"
-}
-```
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/api/v1/logout \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
-## User Management Endpoints
-
-### Get User Profile
-
-Get the current user's profile information.
-
-**Endpoint**: `GET /api/v1/profile`
-
-**Headers**:
-- `Authorization: Bearer <jwt_token>`
-
-**Success Response** (`200 OK`):
-```json
-{
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "user@example.com",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:00:00Z"
-  }
-}
-```
-
-**Error Responses**:
-
-`401 Unauthorized` - Invalid or missing token:
-```json
-{
-  "error": "Authentication required"
-}
-```
-
-`404 Not Found` - User not found:
-```json
-{
-  "error": "User not found"
-}
-```
-
-**Example**:
-```bash
-curl -X GET http://localhost:8080/api/v1/profile \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-```
-
-### Update User Profile
-
-Update the current user's profile information.
-
-**Endpoint**: `PUT /api/v1/profile`
-
-**Headers**:
-- `Authorization: Bearer <jwt_token>`
-- `Content-Type: application/json`
-
-**Request Body**:
-```json
-{
-  "email": "newemail@example.com"
-}
-```
-
-**Success Response** (`200 OK`):
-```json
-{
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "newemail@example.com",
-    "created_at": "2024-01-01T12:00:00Z",
-    "updated_at": "2024-01-01T12:05:00Z"
-  }
-}
-```
-
-**Error Responses**:
-
-`400 Bad Request` - Invalid input:
-```json
-{
-  "error": "Invalid email format"
-}
-```
-
-`409 Conflict` - Email already taken:
-```json
-{
-  "error": "Email already in use"
-}
-```
-
-**Example**:
-```bash
-curl -X PUT http://localhost:8080/api/v1/profile \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newemail@example.com"
-  }'
-```
-
-### Change Password
-
-Change the current user's password.
-
-**Endpoint**: `PUT /api/v1/profile/password`
-
-**Headers**:
-- `Authorization: Bearer <jwt_token>`
-- `Content-Type: application/json`
-
-**Request Body**:
-```json
-{
-  "current_password": "OldPassword123!",
-  "new_password": "NewSecurePassword456!"
-}
-```
-
-**Success Response** (`200 OK`):
-```json
-{
-  "message": "Password updated successfully"
-}
-```
-
-**Error Responses**:
-
-`400 Bad Request` - Invalid input:
-```json
-{
-  "error": "New password must be at least 8 characters"
-}
-```
-
-`401 Unauthorized` - Wrong current password:
-```json
-{
-  "error": "Current password is incorrect"
-}
-```
-
-**Example**:
-```bash
-curl -X PUT http://localhost:8080/api/v1/profile/password \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "current_password": "OldPassword123!",
-    "new_password": "NewSecurePassword456!"
-  }'
-```
-
-## Utility Endpoints
-
-### Check Email Availability
-
-Check if an email address is available for registration.
-
-**Endpoint**: `GET /api/v1/check-email/{email}`
-
-**Parameters**:
-- `email` (path): Email address to check
-
-**Success Response** (`200 OK`):
-```json
-{
-  "email": "test@example.com",
-  "available": true
-}
-```
-
-**Error Responses**:
-
-`400 Bad Request` - Invalid email format:
-```json
-{
-  "error": "Invalid email format"
-}
-```
-
-**Example**:
-```bash
-curl -X GET http://localhost:8080/api/v1/check-email/test@example.com
-```
-
-## Rate Limiting
-
-API endpoints are protected by rate limiting:
-
-- **Default**: 100 requests per minute per IP
-- **Authentication endpoints**: 10 requests per minute per IP
-- **Registration**: 5 requests per minute per IP
-
-Rate limit headers are included in responses:
-
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 99
-X-RateLimit-Reset: 1640995200
-```
-
-When rate limited, the API returns `429 Too Many Requests`:
-
-```json
-{
-  "error": "Rate limit exceeded",
-  "retry_after": 60
-}
-```
-
-## JWT Token Details
-
-### Token Structure
-
-JWT tokens contain the following claims:
-
-```json
-{
-  "sub": "550e8400-e29b-41d4-a716-446655440000",  // User ID
-  "iat": 1640995200,  // Issued at
-  "exp": 1641081600   // Expires at
-}
-```
-
-### Token Expiration
-
-- **Default**: 24 hours
-- **Configurable**: Via `AUTH_JWT_EXPIRATION` environment variable
-- **Refresh**: Re-login required after expiration
-
-### Token Validation
-
-Tokens are validated on each request:
-
-1. **Signature verification**: Using HMAC-SHA256
-2. **Expiration check**: Token must not be expired
-3. **Blacklist check**: Token must not be blacklisted (after logout)
-
-## Performance Characteristics
-
-Based on performance testing:
-
-| Endpoint | Average Response Time | Throughput |
-|----------|----------------------|------------|
-| `GET /health` | <10µs | 100,000+ req/s |
-| `POST /api/v1/register` | ~50ms | 1,000+ req/s |
-| `POST /api/v1/login` | ~45ms | 1,200+ req/s |
-| `GET /api/v1/profile` | ~10µs | 100,000+ req/s |
-| `GET /api/v1/check-email/*` | <1ms | 50,000+ req/s |
-
-### Concurrency
-
-- **Concurrent users**: 1,000+ supported
-- **Concurrent registrations**: 300+ simultaneous
-- **Database connections**: Pooled (max 100)
-
-## Security Considerations
-
-### Password Security
-
-- **Hashing**: bcrypt with default cost (10)
-- **Minimum length**: 8 characters
-- **Complexity**: Recommended (uppercase, lowercase, number, special char)
-
-### JWT Security
-
-- **Algorithm**: HMAC-SHA256
-- **Secret**: Configurable via environment variable
-- **Expiration**: 24 hours default
-- **Blacklisting**: Supported for logout functionality
-
-### Input Validation
-
-- **Email**: RFC 5322 compliant validation
-- **Sanitization**: XSS protection for all inputs
-- **Length limits**: Enforced on all fields
-
-### HTTPS
-
-- **Production**: HTTPS required
-- **Development**: HTTP acceptable
-- **Headers**: Security headers included (HSTS, CSP, etc.)
-
-## Examples
-
-### Complete Registration Flow
-
-```bash
-# 1. Check email availability
-curl -X GET http://localhost:8080/api/v1/check-email/newuser@example.com
-
-# 2. Register user
-curl -X POST http://localhost:8080/api/v1/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newuser@example.com",
-    "password": "SecurePassword123!"
-  }'
-
-# 3. Use the returned token for authenticated requests
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-
-# 4. Get user profile
-curl -X GET http://localhost:8080/api/v1/profile \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Login and Profile Update Flow
-
-```bash
-# 1. Login
-RESPONSE=$(curl -X POST http://localhost:8080/api/v1/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePassword123!"
-  }')
-
-# 2. Extract token
-TOKEN=$(echo $RESPONSE | jq -r '.token')
-
-# 3. Update profile
-curl -X PUT http://localhost:8080/api/v1/profile \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "newemail@example.com"
-  }'
-
-# 4. Logout
-curl -X POST http://localhost:8080/api/v1/logout \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Error Handling Example
-
-```bash
-# Try to register with invalid data
-curl -X POST http://localhost:8080/api/v1/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "invalid-email",
-    "password": "123"
-  }' \
-  -w "HTTP Status: %{http_code}\n"
-
-# Expected response:
-# HTTP Status: 400
-# {
-#   "error": "Validation failed",
-#   "details": {
-#     "email": "Invalid email format",
-#     "password": "Password must be at least 8 characters"
-#   }
-# }
-```
-
-## Support
-
-For API support and questions:
-
-- **Documentation**: [GitHub Repository](https://github.com/zcrossoverz/echoforge)
-- **Issues**: [GitHub Issues](https://github.com/zcrossoverz/echoforge/issues)
-- **API Version**: Check `/api/v1/status` for current version information
+## 📚 Additional Resources
+
+- **Architecture Docs**: `../architecture/` - System design and data flow
+- **Site Guides**: `../guides/site-extension/` - Setup guides for different site types
+- **OpenAPI Spec**: Use with code generators for client libraries
+- **Postman Collection**: Import for immediate API testing
+
+## 🆘 Support
+
+For API issues or questions:
+1. Check error response messages
+2. Verify required headers are included
+3. Ensure site_id matches your configuration
+4. Review authentication token validity
+5. Consult site-specific guides for custom implementations

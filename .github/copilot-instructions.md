@@ -23,6 +23,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-01
 - PostgreSQL 16+ database "bloggo" (host: localhost, user: postgres, password: admin) (006-i-already-create)
 - Go 1.25+ (constitutional requirement) + GORM v1.26+, Gin v1.10+, Zap v1.27+, Viper v1.19+, Testify v1.11+ (007-abstract-post-feature)
 - PostgreSQL 16+ with separate database per site instance (007-abstract-post-feature)
+- Go 1.25+ (constitutional requirement), Markdown, YAML, JSON + Mermaid diagrams, OpenAPI 3.0, Postman collection format, static site generators (008-write-doc-integrate)
+- File system based (docs/, configs/, postman/), existing PostgreSQL schema for API documentation (008-write-doc-integrate)
 
 ## Project Structure (Modular Monolith)
 ```
@@ -60,9 +62,9 @@ migrations/         # golang-migrate DB schemas
 - Lean MVP: 500-1000 LOC, YAGNI principles
 
 ## Recent Changes
+- 008-write-doc-integrate: Added Go 1.25+ (constitutional requirement), Markdown, YAML, JSON + Mermaid diagrams, OpenAPI 3.0, Postman collection format, static site generators
 - 007-abstract-post-feature: Added Go 1.25+ (constitutional requirement) + GORM v1.26+, Gin v1.10+, Zap v1.27+, Viper v1.19+, Testify v1.11+
 - 006-i-already-create: Added Go 1.25+ + GORM v1.26+, Gin v1.10+, Zap v1.27+, Viper v1.19+, bcrypt, JWT v5.3+, Testify v1.11+
-- 006-define-config-and: Added Go 1.25+ + Viper v1.19.0 (config), Zap v1.27.0 (logging), go-playground/validator/v10 (validation)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
