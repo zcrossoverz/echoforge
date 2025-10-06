@@ -55,6 +55,21 @@ func InitializeApplication() (*Application, error) {
 	// Setup repositories
 	userRepo := persistence.NewUserRepository(database.DB)
 
+	// TODO: Setup post system repositories (will be implemented in later tasks)
+	// postRepo := persistence.NewPostRepository(database.DB)
+	// postTypeRepo := persistence.NewPostTypeRepository(database.DB)
+	// postSearchRepo := persistence.NewPostSearchRepository(database.DB)
+
+	// TODO: Setup post system use cases (will be implemented in later tasks)
+	// postUsecase := usecase.NewPostUsecase(postRepo, userRepo, cfg.Post)
+	// postTypeUsecase := usecase.NewPostTypeUsecase(postTypeRepo)
+	// postSearchUsecase := usecase.NewPostSearchUsecase(postSearchRepo)
+
+	// TODO: Setup post system handlers (will be implemented in later tasks)
+	// postHandler := http.NewPostHandler(postUsecase, logger)
+	// postTypeHandler := http.NewPostTypeHandler(postTypeUsecase, logger)
+	// searchHandler := http.NewSearchHandler(postSearchUsecase, logger)
+
 	// Create simple auth handler with basic functionality
 	// For now, we'll create a simplified handler that doesn't require complex use cases
 	authHandler := &http.AuthHandler{
