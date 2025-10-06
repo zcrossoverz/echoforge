@@ -194,7 +194,7 @@ flowchart TD
     
     subgraph "Storage & Database"
         Database[(🗄️ PostgreSQL<br/>Content metadata)]
-        FileStorage[📁 File Storage<br/>Media files)]
+        FileStorage[(📁 File Storage<br/>Media files)]
         SearchDB[(🔍 Search Database<br/>Full-text index)]
     end
     
